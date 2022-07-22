@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>cartpole_gazebo</name>
+  <version>1.0.0</version>
+  <description>cartpole model</description>
+  <license>BSD</license>
+  <url type="website">http://ros.org/wiki/robotiq</url>
+  <author email="ahcorde@erlerobotics.com">Alejandro Hernandez</author>
+  <maintainer email="ahcorde@erlerobotics.com">Alejandro Hernandez</maintainer>
+
+  <buildtool_depend>catkin</buildtool_depend>
+  <build_depend>rospy</build_depend>
+  <build_depend>geometry_msgs</build_depend>
+  <build_depend>std_msgs</build_depend>
+  <build_depend>sensor_msgs</build_depend>
+  <build_depend>math</build_depend>
+  <build_depend>csv</build_depend>
+  <exec_depend>rospy</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>math</exec_depend>
+  <exec_depend>csv</exec_depend>
+  <exec_depend>urdf</exec_depend>
+
+  <export/>
+</package>
