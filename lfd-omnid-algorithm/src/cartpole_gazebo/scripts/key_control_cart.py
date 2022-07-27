@@ -59,10 +59,10 @@ class PublishThread(threading.Thread):
             else:
                 force += self.f * self.mag
             
-            if force > 150:
-                force = 150.0
-            elif force < -150:
-                force = -150.0
+            if force > 240:
+                force = 240.0
+            elif force < -240:
+                force = -240.0
             
             self.condition.release()
             print(force)
