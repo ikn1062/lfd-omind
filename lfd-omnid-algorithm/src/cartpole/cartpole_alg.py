@@ -9,7 +9,7 @@ class ErgodicLFD:
 
         self.K = K
         self.n = n
-        self.L = L # needs upper and lower bound (L0, L1)
+        self.L = L  # needs upper and lower bound (L0, L1)
 
         # Controller Variables:
         self.T = T
@@ -25,6 +25,11 @@ class ErgodicLFD:
         self.lambdak_values = {}
         self.phik_values = {}
         self.ck_values = {}
+        self.hk_values = {}
+
+    def calc_fourier_metrics(self):
+
+
 
     def calc_Fk(self, x, k):
         # Effect of different L value -> not bound from 0 to Li
@@ -36,14 +41,11 @@ class ErgodicLFD:
         return Fk
 
     def calc_hk(self, k):
-        # Need help / resources for hk
         hk = 1
-
         for i in range(self.n):
             l0, l1 = self.L[0], self.L[1]
             k = (k[i] * np.pi) / l1
             hk *= (2 * k * (l1 - l0) - np.sin(2 * k * l0) + np.sin(2 * k * l1)) / (4 * k)
-
         return np.sqrt(hk)
 
     def calc_ck(self, k, x_t=None, T=None):
