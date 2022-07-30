@@ -3,10 +3,9 @@ import numpy as np
 
 """
 TODO:
-1. Add armijo line search -> changing definitions of how reccursive wrapper is used
-2. Test with actual demonstrations
-3. Integrate into a script
-4. Fix DJ
+1. Fix zeros in Fk (from hk)
+2. Test with proper R, Q, P values
+3. Add armijo line search -> changing definitions of how reccursive wrapper is used
 """
 
 
@@ -29,11 +28,11 @@ class MPC:
         self.q = 1100
         self.R = 2*np.eye(self.n, dtype=float)
         self.Q = 10*np.eye(self.n, dtype=float)
-        self.P = np.zeros((self.n, self.n))
+        self.P = np.zeros((self.n, self.n))  # P(t) is P1
         self.L = []
 
         # Grad descent
-        self.beta = 0.95
+        self.beta = 0.35
         self.eps = 0.00001
 
         # Control Variables
@@ -55,7 +54,6 @@ class MPC:
         self.__recursive_wrapper(self.K + 1, [], self.n, self.__calc_ck)
         gamma = self.beta
 
-        # Need to add armijo line search
         while True:
             at, bt = self.__calc_at(), self.__calc_b()
             listP, listr = self.calc_P_r(at, bt)
@@ -98,10 +96,10 @@ class MPC:
         J = np.zeros((self.it+1))
         for i in range(self.it):
             z, v = zeta[i][0], zeta[i][1]
-            a = np.transpose(at[i])
-            b = np.transpose(bt[i])  # might be wrong need to double-check -> b instead of u @ R
-            J_val = a @ z + b @ v    # might be wrong due to b -> u @ R @ v
-            J[i] = J_val[0][0] # need to double-check this
+            a_T = np.transpose(at[i])
+            b_T = np.transpose(bt[i])
+            J_val = a_T @ z + b_T @ v
+            J[i] = J_val
         J_integral = np.trapz(J, dx=self.dt)
         return J_integral
 
@@ -112,9 +110,10 @@ class MPC:
         listr[0] = -np.array([[0.]*self.n]).T
         Rinv = np.linalg.inv(self.R)
         for i in range(self.it):
-            P_dot = P@A + np.transpose(A)@P - P@(B @ Rinv @ np.transpose(B)) @ P + Q
+            # difference in Todds lecture notes for Pdot
+            P_dot = P@(B @ Rinv @ np.transpose(B)) @ P - Q - P@A + np.transpose(A)@P
             a, b = at[i], bt[i]
-            r_dot = np.transpose(A - B @ Rinv @ np.transpose(B) @ P) @ listr[i] + a - (P @ B @ Rinv) @ b
+            r_dot = - np.transpose(A - B @ Rinv @ np.transpose(B) @ P) @ listr[i] - a + (P @ B @ Rinv) @ b
             listP[i+1] = self.dt * P_dot + listP[i]
             listr[i+1] = self.dt * r_dot + listr[i]
         listP, listr = np.flip(listP, 0), np.flip(listr, 0)
