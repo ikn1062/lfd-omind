@@ -210,7 +210,7 @@ class MPC:
         # When calling this function, call with K+1
         if n > 0:
             for k in range(K):
-                self.__recursive_wrapper(K, n - 1, k_arr + [k], f)
+                self.__recursive_wrapper(K, k_arr + [k], n - 1, f)
         else:
             f(k_arr)
 

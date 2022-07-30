@@ -2,7 +2,7 @@ import numpy as np
 
 
 class ErgodicHelper:
-    def __int__(self, D, E, K, L, dt):
+    def __init__(self, D, E, K, L, dt):
         # Creating Fourier Distributions
         self.D = D
         self.E = E
@@ -24,12 +24,15 @@ class ErgodicHelper:
 
     def calc_fourier_metrics(self):
         self.__recursive_wrapper(self.K+1, [], self.n, self.calc_lambda_k)
-        self.__recursive_wrapper(self.K + 1, [], self.n, self.phik_values)
+        self.__recursive_wrapper(self.K + 1, [], self.n, self.calc_phik)
         return self.hk_values, self.phik_values, self.lambdak_values
 
     def calc_Fk(self, x, k):
         # Effect of different L value -> not bound from 0 to Li
         hk = self.calc_hk(k)
+        # Need to fix this
+        if not hk:
+            return 0
         fourier_basis = 1
         for i in range(len(x)):
             fourier_basis *= np.cos((k[i]*np.pi*x[i])/self.L[i][1])
@@ -39,17 +42,22 @@ class ErgodicHelper:
     def calc_hk(self, k):
         hk = 1
         for i in range(self.n):
-            l0, l1 = self.L[0], self.L[1]
-            k = (k[i] * np.pi) / l1
-            hk *= (2 * k * (l1 - l0) - np.sin(2 * k * l0) + np.sin(2 * k * l1)) / (4 * k)
+            l0, l1 = self.L[i][0], self.L[i][1]
+            k_i = (k[i] * np.pi) / l1
+            if not k_i:
+                hk *= 0
+                continue
+            hk *= (2 * k_i * (l1 - l0) - np.sin(2 * k_i * l0) + np.sin(2 * k_i * l1)) / (4 * k_i)
         k_str = ''.join(str(i) for i in k)
+        hk = np.sqrt(hk)
         self.hk_values[k_str] = hk
-        return np.sqrt(hk)
+        return hk
 
-    def calc_ck(self, k, x_t):
-        T = len(x_t) * self.dt
-        Fk_x = np.zeros(T)
-        for i in range(T):
+    def calc_ck(self, x_t, k):
+        x_len = len(x_t)
+        T = x_len * self.dt
+        Fk_x = np.zeros(x_len)
+        for i in range(x_len):
             Fk_x[i] = self.calc_Fk(x_t[i], k)
         ck = (1 / T) * np.trapz(Fk_x, dx=self.dt)
         return ck
@@ -57,7 +65,7 @@ class ErgodicHelper:
     def calc_phik(self, k):
         phik = 0
         for i in range(self.m):
-            phik += self.E * self.w[i] * self.calc_ck(self.D[i], k)
+            phik += self.E[i] * self.w[i] * self.calc_ck(self.D[i], k)
         k_str = ''.join(str(i) for i in k)
         self.phik_values[k_str] = phik
         # return phik
@@ -72,6 +80,6 @@ class ErgodicHelper:
         # When calling this function, call with K+1
         if n > 0:
             for k in range(K):
-                self.__recursive_wrapper(K, n - 1, k_arr + [k], f)
+                self.__recursive_wrapper(K, k_arr + [k], n - 1, f)
         else:
             f(k_arr)

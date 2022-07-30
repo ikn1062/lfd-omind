@@ -31,7 +31,7 @@ def main():
     sub = rospy.Subscriber("/cart_pole/joint_states", JointState, callback=pole_state)    
     rospy.loginfo("Pole State Node has been started")
 
-    f = open('/home/ishaan/catkin_ws/src/cartpole_gazebo/dynamics/test.csv', 'w')
+    f = open('/home/ishaan/catkin_ws/src/cartpole_gazebo/dynamics/test2.csv', 'w')
     global csv_writer
     # csv_writer = csv.writer(f)
         
