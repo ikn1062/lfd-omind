@@ -4,8 +4,8 @@ import numpy as np
 """
 TODO:
 1. Fix zeros in Fk (from hk)
-2. Test with proper R, Q, P values
-3. Add armijo line search -> changing definitions of how reccursive wrapper is used
+2. Ask about actual grad descent from paper
+3. Test with proper R, Q, P values
 """
 
 
@@ -54,7 +54,8 @@ class MPC:
         self.__recursive_wrapper(self.K + 1, [], self.n, self.__calc_ck)
         gamma = self.beta
 
-        while True:
+        t0 = self.t0
+        while t0 < self.tf:
             at, bt = self.__calc_at(), self.__calc_b()
             listP, listr = self.calc_P_r(at, bt)
             zeta = self.desc_dir(listP, listr, bt)
@@ -66,8 +67,7 @@ class MPC:
 
             self.x_trajectory = self.make_trajectory(x0, u_new)
 
-            if self.DJ(zeta, at, bt) < self.eps:
-                break
+            t0 += self.dt
         return 0
 
     def make_trajectory(self, x0, u):
