@@ -11,16 +11,14 @@ TODO:
 class MPC:
     def __init__(self, x0, t0, tf, hk, phik, lambdak, dt=0.1):
         # System variables
-        self.x0 = x0
         self.n = len(x0)
         self.t0, self.tf = t0, tf
         self.dt = dt
         self.t = np.arange(self.t0, self.tf, self.dt)
-        self.it = len(self.t)
 
         # Initialize x_t and u_t variables
-        self.u = np.zeros((self.it, self.n, 1))
-        self.x_trajectory = []
+        self.u = np.zeros((np.shape(x0)))
+        self.x_t = x0
 
         # Control Constants
         self.K = 6
@@ -35,7 +33,7 @@ class MPC:
         self.eps = 0.00001
 
         # Control Variables
-        self.at = np.zeros((np.shape(self.x_trajectory)))
+        self.at = np.zeros((np.shape(self.x_t)))
         self.bt = np.zeros((np.shape(self.u)))
 
         # Dynamics constants
@@ -49,22 +47,17 @@ class MPC:
         self.ck_values = {}
 
     def grad_descent(self):
-        self.x_trajectory = self.make_trajectory(self.x0, self.u)
-        self.__recursive_wrapper(self.K + 1, [], self.n, self.__calc_ck)
         gamma = self.beta
-
         t0 = self.t0
         while t0 < self.tf:
+            self.__recursive_wrapper(self.K + 1, [], self.n, self.__calc_ck)
             at, bt = self.__calc_at(), self.__calc_b()
             listP, listr = self.calc_P_r(at, bt)
             zeta = self.desc_dir(listP, listr, bt)
 
-            x0 = self.x_trajectory[0, :]
             v = zeta[:][1]
-            u_new = self.u + gamma * v
-            u_new = u_new[:, 0]
-
-            self.x_trajectory = self.make_trajectory(x0, u_new)
+            self.u = self.u + gamma * v
+            self.x_t = self.__integrate(self.x_t, self.u)
 
             t0 += self.dt
         return 0
@@ -82,41 +75,34 @@ class MPC:
         A, B = self.A, self.B
         z = np.array([[0.0] * self.n])
         Rinv = np.linalg.inv(self.R)
-        zeta = []
-        for i in range(self.it):
-            P, r, b = listP[i], listr[i], bt[i]
-            v = -Rinv @ np.transpose(B) @ P @ z - Rinv @ B.T @ r - Rinv @ b
-            zeta.append((z, v))
-            zdot = A @ z + B @ v
-            z += zdot * self.dt
+
+        P, r, b = listP, listr, bt
+        v = -Rinv @ np.transpose(B) @ P @ z - Rinv @ B.T @ r - Rinv @ b
+        zdot = A @ z + B @ v
+        z += zdot * self.dt
+
+        zeta = (z, v)
         return zeta
 
     def DJ(self, zeta, at, bt):
-        J = np.zeros((self.it+1))
-        for i in range(self.it):
-            z, v = zeta[i][0], zeta[i][1]
-            a_T = np.transpose(at[i])
-            b_T = np.transpose(bt[i])
-            J_val = a_T @ z + b_T @ v
-            J[i] = J_val
-        J_integral = np.trapz(J, dx=self.dt)
-        return J_integral
+        z, v = zeta[0], zeta[1]
+        a_T = np.transpose(at)
+        b_T = np.transpose(bt)
+        J = a_T @ z + b_T @ v
+        return J
 
     def calc_P_r(self, at, bt):
         P, A, B, Q = self.P, self.A, self.B, self.Q
-        listP, listr = np.zeros((self.it+1, self.n, self.n)), np.zeros((self.it+1, self.n, 1))
-        listP[0] = np.zeros(np.shape(P))
-        listr[0] = -np.array([[0.]*self.n]).T
+        P_new = np.zeros(np.shape(P))
+        r_new = -np.array([[0.]*self.n]).T
         Rinv = np.linalg.inv(self.R)
-        for i in range(self.it):
-            # difference in Todds lecture notes for Pdot
-            P_dot = P@(B @ Rinv @ np.transpose(B)) @ P - Q - P@A + np.transpose(A)@P
-            a, b = at[i], bt[i]
-            r_dot = - np.transpose(A - B @ Rinv @ np.transpose(B) @ P) @ listr[i] - a + (P @ B @ Rinv) @ b
-            listP[i+1] = self.dt * P_dot + listP[i]
-            listr[i+1] = self.dt * r_dot + listr[i]
-        listP, listr = np.flip(listP, 0), np.flip(listr, 0)
-        return listP, listr
+
+        P_dot = P@(B @ Rinv @ np.transpose(B)) @ P - Q - P@A + np.transpose(A)@P
+        r_dot = - np.transpose(A - B @ Rinv @ np.transpose(B) @ P) @ r_new - at + (P @ B @ Rinv) @ bt
+        P_new = self.dt * P_dot + P_new
+        r_new = self.dt * r_dot + r_new
+
+        return P_new, r_new
 
     def __dynamics(self):
         # https://sites.wustl.edu/slowfastdynamiccontrolapproaches/cart-pole-system/cart-pole-dynamics-system/
@@ -167,27 +153,23 @@ class MPC:
         return Fk
 
     def __calc_DFk(self, k):
-        xt = self.x_trajectory
+        x_t = self.x_t
         hk = self.hk_values[self.__k_str(k)]
-        dfk = np.zeros(np.shape(xt))
-        for t, x in enumerate(xt):
-            for i in x:
-                ki = (k[i] * np.pi)/self.L[i]
-                dfk_xi = (1/hk) * -ki * np.cos(ki * x[i]) * np.sin(ki * x[i])
-                dfk[t, :] = dfk_xi
+        dfk = np.zeros(np.shape(x_t))
+        for i in x_t:
+            ki = (k[i] * np.pi)/self.L[i][1]
+            dfk[i] = (1/hk) * -ki * np.cos(ki * x_t[i]) * np.sin(ki * x_t[i])
         return dfk
 
     def __calc_ck(self, k):
-        x_t = self.x_trajectory
-        Fk_x = np.zeros(len(x_t))
-        for i in range(len(x_t)):
-            Fk_x[i] = self.__calc_Fk(x_t[i], k)
-        ck = (1 / self.tf) * np.trapz(Fk_x, dx=self.dt)
+        x_t = self.x_t
+        Fk_x = self.__calc_Fk(x_t, k)
+        ck = (1 / self.dt) * np.trapz(Fk_x, dx=self.dt)
         self.ck_values[self.__k_str(k)] = ck
         return ck
 
     def __calc_at(self):
-        self.at = np.zeros((np.shape(self.x_trajectory)))
+        self.at = np.zeros((np.shape(self.x_t)))
         self.__recursive_wrapper(self.K+1, [], self.n, self.__calc_a)
         self.at *= self.q
         return self.at
