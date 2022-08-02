@@ -3,19 +3,18 @@ import numpy as np
 
 """
 TODO:
-1. Fix zeros in Fk (from hk)
 2. Ask about actual grad descent from paper
 3. Test with proper R, Q, P values
 """
 
 
 class MPC:
-    def __init__(self, x0, t0, tf):
+    def __init__(self, x0, t0, tf, hk, phik, lambdak, dt=0.1):
         # System variables
         self.x0 = x0
         self.n = len(x0)
         self.t0, self.tf = t0, tf
-        self.dt = 0.1
+        self.dt = dt
         self.t = np.arange(self.t0, self.tf, self.dt)
         self.it = len(self.t)
 
@@ -44,10 +43,10 @@ class MPC:
         self.A, self.B = self.__calc_A_B()
 
         # Variable values as a function of k
-        self.hk_values = {}
+        self.hk_values = hk
+        self.phik_values = phik
+        self.lambdak_values = lambdak
         self.ck_values = {}
-        self.phik_values = {}
-        self.lambdak_values = {}
 
     def grad_descent(self):
         self.x_trajectory = self.make_trajectory(self.x0, self.u)

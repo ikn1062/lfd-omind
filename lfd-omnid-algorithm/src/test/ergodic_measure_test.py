@@ -17,7 +17,7 @@ def test_init(D, E, K, L, dt):
 def test_calc_hk(D, E, K, L, dt):
     ergodic_test = ErgodicHelper(D, E, K, L, dt)
     hk = ergodic_test.calc_hk([0, 0, 0, 0])
-    assert hk == 0.0, f"expected 0.0, got: {hk}"
+    assert abs(hk - 352.7) < 0.1, f"expected 352.7, got: {hk}"
     # Based on how hk is defined, it is a constant dependent on L
     hk = ergodic_test.calc_hk([1, 1, 1, 1])
     assert abs(hk - 88.17) < 0.1, f"expected 7775, got: {hk}"
@@ -94,6 +94,7 @@ def test_lambda_k(D, E, K, L, dt):
 def test_ergodic_calc(D, E, K, L, dt):
     # this is hard to hand calculate because we are calculating values over an entire trajectory
     # we're going to see if it prints a value, and will evaluate based off behavior of plots
+    print("Start Ergodic Calc test")
     ergodic_test = ErgodicHelper(D, E, K, L, dt)
     hk, lambdak, phik = ergodic_test.calc_fourier_metrics()
     assert hk["1234"], f"expected hk value, got: {None}"
@@ -102,6 +103,7 @@ def test_ergodic_calc(D, E, K, L, dt):
     assert lambdak["2344"], f"expected hk value, got: {None}"
     assert phik["4431"], f"expected hk value, got: {None}"
     assert phik["1422"], f"expected hk value, got: {None}"
+    print("test_ergodic_calc pass")
     return 0
 
 

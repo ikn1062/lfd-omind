@@ -23,16 +23,13 @@ class ErgodicHelper:
         self.hk_values = {}
 
     def calc_fourier_metrics(self):
-        self.__recursive_wrapper(self.K+1, [], self.n, self.calc_lambda_k)
         self.__recursive_wrapper(self.K + 1, [], self.n, self.calc_phik)
+        self.__recursive_wrapper(self.K+1, [], self.n, self.calc_lambda_k)
         return self.hk_values, self.phik_values, self.lambdak_values
 
     def calc_Fk(self, x, k):
         # Effect of different L value -> not bound from 0 to Li
         hk = self.calc_hk(k)
-        # Need to fix this
-        if not hk:
-            return 0
         fourier_basis = 1
         for i in range(len(x)):
             fourier_basis *= np.cos((k[i]*np.pi*x[i])/self.L[i][1])
@@ -43,10 +40,10 @@ class ErgodicHelper:
         hk = 1
         for i in range(self.n):
             l0, l1 = self.L[i][0], self.L[i][1]
-            k_i = (k[i] * np.pi) / l1
-            if not k_i:
-                hk *= 0
+            if not k[i]:
+                hk *= (l1 - l0)
                 continue
+            k_i = (k[i] * np.pi) / l1
             hk *= (2 * k_i * (l1 - l0) - np.sin(2 * k_i * l0) + np.sin(2 * k_i * l1)) / (4 * k_i)
         k_str = ''.join(str(i) for i in k)
         hk = np.sqrt(hk)
