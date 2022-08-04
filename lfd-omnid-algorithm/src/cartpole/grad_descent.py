@@ -3,41 +3,38 @@ import numpy as np
 
 """
 TODO:
-2. Ask about actual grad descent from paper
-3. Test with proper R, Q, P values
+1. check_ck
 """
 
 
 class MPC:
-    def __init__(self, x0, t0, tf, hk, phik, lambdak, dt=0.1):
+    def __init__(self, x0, t0, tf, L, hk, phik, lambdak, dt=0.1, K=6):
         # System variables
         self.n = len(x0)
         self.t0, self.tf = t0, tf
         self.dt = dt
-        self.t = np.arange(self.t0, self.tf, self.dt)
 
         # Initialize x_t and u_t variables
-        self.u = np.zeros((np.shape(x0)))
+        self.u = 0
         self.x_t = x0
 
         # Control Constants
-        self.K = 6
+        self.K = K
         self.q = 1100
-        self.R = 2*np.eye(self.n, dtype=float)
+        self.R = 2
         self.Q = 10*np.eye(self.n, dtype=float)
         self.P = np.zeros((self.n, self.n))  # P(t) is P1
-        self.L = []
+        self.L = L
 
         # Grad descent
         self.beta = 0.35
-        self.eps = 0.00001
 
         # Control Variables
         self.at = np.zeros((np.shape(self.x_t)))
-        self.bt = np.zeros((np.shape(self.u)))
+        self.bt = 0
 
         # Dynamics constants
-        self.M, self.m, self.l = 0, 0, 0
+        self.M, self.m, self.l = 20, 20, 1.0
         self.A, self.B = self.__calc_A_B()
 
         # Variable values as a function of k
@@ -50,34 +47,23 @@ class MPC:
         gamma = self.beta
         t0 = self.t0
         while t0 < self.tf:
-            self.__recursive_wrapper(self.K + 1, [], self.n, self.__calc_ck)
-            at, bt = self.__calc_at(), self.__calc_b()
+            at, bt = self.calc_at(), self.calc_b()
             listP, listr = self.calc_P_r(at, bt)
             zeta = self.desc_dir(listP, listr, bt)
 
             v = zeta[:][1]
             self.u = self.u + gamma * v
-            self.x_t = self.__integrate(self.x_t, self.u)
+            self.x_t = self.integrate(self.x_t, self.u)
 
             t0 += self.dt
         return 0
 
-    def make_trajectory(self, x0, u):
-        # Creates a trajectory given initial state and controls
-        t = np.arange(self.t0, self.tf, self.dt)
-        x_traj = np.zeros((len(t)+1, len(x0)))
-        x_traj[0, :] = x0[:]
-        for i in range(1, len(t)+1):
-            x_traj[:, i] = self.__integrate(x_traj[i-1, :], u[i, :])
-        return x_traj
-
-    def desc_dir(self, listP, listr, bt):
+    def desc_dir(self, P, r, b):
         A, B = self.A, self.B
-        z = np.array([[0.0] * self.n])
-        Rinv = np.linalg.inv(self.R)
+        z = np.zeros((np.shape(self.x_t)))
+        Rinv = (-1/self.R)
 
-        P, r, b = listP, listr, bt
-        v = -Rinv @ np.transpose(B) @ P @ z - Rinv @ B.T @ r - Rinv @ b
+        v = -Rinv * np.transpose(B) @ P @ z - Rinv * B.T @ r - Rinv * b
         zdot = A @ z + B @ v
         z += zdot * self.dt
 
@@ -87,24 +73,24 @@ class MPC:
     def DJ(self, zeta, at, bt):
         z, v = zeta[0], zeta[1]
         a_T = np.transpose(at)
-        b_T = np.transpose(bt)
-        J = a_T @ z + b_T @ v
+        b_T = -1/bt
+        J = a_T @ z + b_T * v
         return J
 
     def calc_P_r(self, at, bt):
         P, A, B, Q = self.P, self.A, self.B, self.Q
         P_new = np.zeros(np.shape(P))
         r_new = -np.array([[0.]*self.n]).T
-        Rinv = np.linalg.inv(self.R)
+        Rinv = (-1/self.R)
 
-        P_dot = P@(B @ Rinv @ np.transpose(B)) @ P - Q - P@A + np.transpose(A)@P
-        r_dot = - np.transpose(A - B @ Rinv @ np.transpose(B) @ P) @ r_new - at + (P @ B @ Rinv) @ bt
+        P_dot = P@(B * Rinv * np.transpose(B)) @ P - Q - P@A + np.transpose(A)@P
+        r_dot = - np.transpose(A - B * Rinv * np.transpose(B) @ P) @ r_new - at + (P @ B * Rinv) * bt
         P_new = self.dt * P_dot + P_new
         r_new = self.dt * r_dot + r_new
 
         return P_new, r_new
 
-    def __dynamics(self):
+    def dynamics(self):
         # https://sites.wustl.edu/slowfastdynamiccontrolapproaches/cart-pole-system/cart-pole-dynamics-system/
         M, m, l = self.M, self.m, self.l
         g = 9.81  # gravitational constant
@@ -117,7 +103,7 @@ class MPC:
         return a, b, c, d
 
     def __calc_A_B(self):
-        a, b, c, d = self.__dynamics()
+        a, b, c, d = self.dynamics()
         A = np.array([[0, 1, 0, 0],
                       [0, 0, a, 0],
                       [0, 0, 0, 1],
@@ -128,15 +114,15 @@ class MPC:
                       [d]])
         return A, B
 
-    def __cart_pole_dyn(self, X, U):
+    def cart_pole_dyn(self, X, U):
         # Cart pole dynamics should take state x(t) and u(t) and return array corresponding to dynamics
         A, B = self.A, self.B
-        Xdot = A@X + B@U
+        Xdot = A@X + B*U
         return Xdot
 
-    def __integrate(self, xi, ui):
+    def integrate(self, xi, ui):
         # Finds x_t(t + dt) given dynamcis f, and x_t, u_t, and dt
-        f = self.__cart_pole_dyn
+        f = self.cart_pole_dyn
         k1 = self.dt * f(xi, ui)
         k2 = self.dt * f(xi + k1 / 2, ui)
         k3 = self.dt * f(xi + k2 / 2, ui)
@@ -152,23 +138,24 @@ class MPC:
         Fk = (1 / hk) * fourier_basis
         return Fk
 
-    def __calc_DFk(self, k):
+    def calc_DFk(self, k):
         x_t = self.x_t
         hk = self.hk_values[self.__k_str(k)]
         dfk = np.zeros(np.shape(x_t))
-        for i in x_t:
+        for i in range(len(x_t)):
             ki = (k[i] * np.pi)/self.L[i][1]
             dfk[i] = (1/hk) * -ki * np.cos(ki * x_t[i]) * np.sin(ki * x_t[i])
         return dfk
 
-    def __calc_ck(self, k):
+    def calc_ck(self, k):
         x_t = self.x_t
         Fk_x = self.__calc_Fk(x_t, k)
-        ck = (1 / self.dt) * np.trapz(Fk_x, dx=self.dt)
+        ck = Fk_x
+        # ck = (1 / self.dt) * np.trapz(Fk_x, dx=self.dt)
         self.ck_values[self.__k_str(k)] = ck
         return ck
 
-    def __calc_at(self):
+    def calc_at(self):
         self.at = np.zeros((np.shape(self.x_t)))
         self.__recursive_wrapper(self.K+1, [], self.n, self.__calc_a)
         self.at *= self.q
@@ -177,14 +164,18 @@ class MPC:
     def __calc_a(self, k):
         k_str = self.__k_str(k)
         lambdak = self.lambdak_values[k_str]
-        ck = self.ck_values[k_str]
+        ck = self.calc_ck(k)
         phik = self.phik_values[k_str]
-        # DFk should be of size (trajectory), maybe change to matrix addition
-        self.at = ((lambdak * 2 * (ck - phik) * (1/self.tf)) * self.__calc_DFk(k)) + self.at
+        # DFk should be of size (xt), maybe change to matrix addition
+        self.at = ((lambdak * 2 * (ck - phik) * (1/self.tf)) * self.calc_DFk(k)) + self.at
 
-    def __calc_b(self):
+    def calc_b(self):
         u, R = self.u, self.R
-        return np.transpose(u)@R
+        try:
+            ut = (-1/u)
+        except ZeroDivisionError:
+            ut = np.NINF
+        return ut*R
 
     def __recursive_wrapper(self, K, k_arr, n, f):
         # When calling this function, call with K+1
