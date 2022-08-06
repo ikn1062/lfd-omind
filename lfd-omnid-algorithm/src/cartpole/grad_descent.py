@@ -1,33 +1,28 @@
 import numpy as np
-
-
-"""
-TODO:
-1. check_ck
-"""
+import matplotlib.pyplot as plt
 
 
 class MPC:
-    def __init__(self, x0, t0, tf, L, hk, phik, lambdak, dt=0.1, K=6):
+    def __init__(self, x0, t0, tf, L, hk, phik, lambdak, dt=0.01, K=6):
         # System variables
         self.n = len(x0)
         self.t0, self.tf = t0, tf
         self.dt = dt
 
         # Initialize x_t and u_t variables
-        self.u = 0
+        self.u = 1
         self.x_t = x0
 
         # Control Constants
         self.K = K
-        self.q = 1100
+        self.q = 200
         self.R = 2
         self.Q = 10*np.eye(self.n, dtype=float)
-        self.P = np.zeros((self.n, self.n))  # P(t) is P1
+        self.P = np.eye(self.n)  # P(t) is P1
         self.L = L
 
         # Grad descent
-        self.beta = 0.35
+        self.beta = 0.15
 
         # Control Variables
         self.at = np.zeros((np.shape(self.x_t)))
@@ -46,6 +41,9 @@ class MPC:
     def grad_descent(self):
         gamma = self.beta
         t0 = self.t0
+
+        output_x, output_u = [], []
+
         while t0 < self.tf:
             at, bt = self.calc_at(), self.calc_b()
             listP, listr = self.calc_P_r(at, bt)
@@ -53,9 +51,39 @@ class MPC:
 
             v = zeta[:][1]
             self.u = self.u + gamma * v
+            if self.u > 200:
+                self.u = 200
+            if self.u < -200:
+                self.u = -200
+
             self.x_t = self.integrate(self.x_t, self.u)
 
+            while self.x_t[2] < 0:
+                self.x_t[2] += 2*np.pi
+            while self.x_t[2] > 2*np.pi:
+                self.x_t[2] -= 2*np.pi
+            if self.x_t[2] > np.pi:
+                self.x_t[2] -= 2*np.pi
+
+            output_x.append(self.x_t)
+            output_u.append(self.u)
+            print(f"x: {self.x_t}, u: {self.u}")
+            print(f"DJ: {self.DJ(zeta, at, bt)}")
+
             t0 += self.dt
+
+        output_x = np.array(output_x)
+        t = np.arange(self.t0, self.tf+self.dt, self.dt)
+        plt.plot(t, output_x[:, 0])
+        plt.show()
+        plt.plot(t, output_x[:, 1])
+        plt.show()
+        plt.plot(t, output_x[:, 2])
+        plt.show()
+        plt.plot(t, output_x[:, 3])
+        plt.show()
+        plt.plot(t, output_u)
+        plt.show()
         return 0
 
     def desc_dir(self, P, r, b):
@@ -63,7 +91,7 @@ class MPC:
         z = np.zeros((np.shape(self.x_t)))
         Rinv = (-1/self.R)
 
-        v = -Rinv * np.transpose(B) @ P @ z - Rinv * B.T @ r - Rinv * b
+        v = -Rinv * np.transpose(B) @ P @ z - Rinv * np.transpose(B) @ r - Rinv * b
         zdot = A @ z + B @ v
         z += zdot * self.dt
 

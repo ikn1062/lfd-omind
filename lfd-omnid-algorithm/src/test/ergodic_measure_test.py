@@ -109,9 +109,9 @@ def test_ergodic_calc(D, E, K, L, dt):
 
 if __name__ == "__main__":
     D = []
-    for i in range(1, 8):
+    for i in range(1, 7):
         D.append(np.genfromtxt(f'src/cartpole_gazebo/dynamics/test{i}.csv', delimiter=','))
-    E, K, dt = [-1, -1, 1, -1, -1, -1, -1], 4, 0.1
+    E, K, dt = [1, -1, -1, -1, -1, -1], 6, 0.01
     L = [[-np.pi, np.pi], [-11, 11], [-15, 15], [-15, 15]]
     test_init(D, E, K, L, dt)
     test_calc_hk(D, E, K, L, dt)

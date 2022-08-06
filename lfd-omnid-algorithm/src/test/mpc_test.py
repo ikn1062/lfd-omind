@@ -103,26 +103,31 @@ if __name__ == "__main__":
     hk, phik, lambdak = {}, {}, {}
 
     print("Get MPC model - no ergodic variables")
-    x0 = [0, 0, 0, 0]
+    x0 = [-np.pi, 0, 0, 0]
     t0, tf = 0, 30
     mpc_model = MPC(x0, t0, tf, L, hk, phik, lambdak)
+
 
     print("Start MPC test")
     test_mpc_init(mpc_model)
     test_dynamics_1(mpc_model)
     test_dynamics_2(mpc_model)
 
+
     D = []
-    for i in range(1, 8):
+    for i in range(1, 7):
         D.append(np.genfromtxt(f'src/cartpole_gazebo/dynamics/test{i}.csv', delimiter=','))
-    E, K, dt = [-1, -1, 1, -1, -1, -1, -1], 2, 0.1
+    E, K, dt = [1, -1, -1, -1, -1, -1], 2, 0.01
+    # E, K, dt = [1, -1, -1, -1, -1, -1], 6, 0.01
     ergodic_test = ErgodicHelper(D, E, K, L, dt)
     print("Getting Ergodic Helpers")
     hk, lambdak, phik = ergodic_test.calc_fourier_metrics()
-    mpc_model_1 = MPC(x0, t0, tf, L, hk, phik, lambdak, K=2)
+    mpc_model_1 = MPC(x0, t0, tf, L, hk, phik, lambdak, dt=dt, K=K)
+
 
     test_ck_DFk(mpc_model_1)
     test_at_bt(mpc_model_1)
     test_desc_dir(mpc_model_1)
+
 
 

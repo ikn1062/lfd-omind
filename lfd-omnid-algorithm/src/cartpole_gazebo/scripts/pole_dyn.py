@@ -23,7 +23,7 @@ def pole_state(msg: JointState):
     rospy.loginfo(output)
     
     if csv_writer != None:
-        csv_writer.writerow([theta, theta_dot, pos_x, vel_x])
+        csv_writer.writerow([pos_x, vel_x, theta, theta_dot])
 
 
 def main():
