@@ -65,7 +65,7 @@ class PublishThread(threading.Thread):
                 force = -240.0
             
             self.condition.release()
-            print(force)
+            # print(force)
             self.publisher.publish(force)
             
         # Publish stop message when thread exits.
