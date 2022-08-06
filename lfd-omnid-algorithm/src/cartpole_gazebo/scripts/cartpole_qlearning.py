@@ -1,4 +1,28 @@
+#!/usr/bin/env python3
 import numpy as np
+import rospy
+from sensor_msgs.msg import JointState
+from math import pi
+
+
+cartpole_state = np.array([0, 0, 0, 0])
+
+
+def cartpole_state(msg: JointState):  
+    global cartpole_state  
+    theta, theta_dot = msg.position[0], msg.velocity[0]
+    pos_x, vel_x = msg.position[1], msg.velocity[1]
+    
+    theta += pi
+    while theta < 0:
+        theta += 2 * pi
+    while theta > 2 * pi:
+        theta -= 2 * pi
+    if theta > pi:
+        theta -= 2 *pi
+    
+    cartpole_state = [pos_x, vel_x, theta, theta_dot]
+
 
 
 class CartPoleAgent:
@@ -31,6 +55,7 @@ class CartPoleAgent:
                 self.env.render()
                 # Choose action based on ep_greedy_policy
                 action = self.__choose_action(exploration_rate, state)
+                print(cartpole_state)
                 # get new state, reward, and end-signal
                 new_state, reward, done, _ = self.env.step(action)
                 new_state = self.__discretize_state(new_state)
@@ -66,8 +91,15 @@ class CartPoleAgent:
     def __update_q(self, state, action, r, a, new_state):
         self.Qtable[state][action] = self.Qtable[state][action] + \
                                      a * (r + self.gamma * np.max(self.Qtable[new_state]) - self.Qtable[state][action])
+                                     
+    def train(self):
+        while not rospy.is_shutdown():
+            self.cartpole_state = cartpole_state
+            rospy.sleep(0.01)
 
 
 if __name__ == '__main__':
+    rospy.init_node("cartpole_q")
+    sub = rospy.Subscriber("/cart_pole/joint_states", JointState, callback=cartpole_state)    
     agent = CartPoleAgent()
-    agent.qlearning_train()
+    agent.train()
