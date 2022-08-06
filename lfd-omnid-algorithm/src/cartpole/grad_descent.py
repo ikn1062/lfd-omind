@@ -15,10 +15,18 @@ class MPC:
 
         # Control Constants
         self.K = K
-        self.q = 200
-        self.R = 2
-        self.Q = 10*np.eye(self.n, dtype=float)
-        self.P = np.eye(self.n)  # P(t) is P1
+        self.q = 1000
+        self.R = 1
+        # self.Q = 10*np.eye(self.n, dtype=float)
+        self.Q = np.array([[1, 0, 0, 0],
+                           [0, 1, 0, 0],
+                           [0, 0, 100, 0],
+                           [0, 0, 0, 100]])
+        # self.P = 10 * np.eye(self.n)  # P(t) is P1
+        self.P = 100 * np.array([[0.01, 0, 0, 0],
+                                [0, 0.01, 0, 0],
+                                [0, 0, 1, 0],
+                                [0, 0, 0, 1]])
         self.L = L
 
         # Grad descent
@@ -59,11 +67,11 @@ class MPC:
             self.x_t = self.integrate(self.x_t, self.u)
 
             while self.x_t[2] < 0:
-                self.x_t[2] += 2*np.pi
-            while self.x_t[2] > 2*np.pi:
-                self.x_t[2] -= 2*np.pi
+                self.x_t[2] += 2 * np.pi
+            while self.x_t[2] > 2 * np.pi:
+                self.x_t[2] -= 2 * np.pi
             if self.x_t[2] > np.pi:
-                self.x_t[2] -= 2*np.pi
+                self.x_t[2] -= 2 * np.pi
 
             output_x.append(self.x_t)
             output_u.append(self.u)
@@ -73,7 +81,8 @@ class MPC:
             t0 += self.dt
 
         output_x = np.array(output_x)
-        t = np.arange(self.t0, self.tf+self.dt, self.dt)
+        output_u = np.array(output_u)
+        t = np.arange(self.t0, self.tf + self.dt, self.dt)
         plt.plot(t, output_x[:, 0])
         plt.show()
         plt.plot(t, output_x[:, 1])
@@ -82,14 +91,14 @@ class MPC:
         plt.show()
         plt.plot(t, output_x[:, 3])
         plt.show()
-        plt.plot(t, output_u)
+        plt.plot(t, output_u[:, 0])
         plt.show()
         return 0
 
     def desc_dir(self, P, r, b):
         A, B = self.A, self.B
         z = np.zeros((np.shape(self.x_t)))
-        Rinv = (-1/self.R)
+        Rinv = (-1 / self.R)
 
         v = -Rinv * np.transpose(B) @ P @ z - Rinv * np.transpose(B) @ r - Rinv * b
         zdot = A @ z + B @ v
@@ -101,17 +110,17 @@ class MPC:
     def DJ(self, zeta, at, bt):
         z, v = zeta[0], zeta[1]
         a_T = np.transpose(at)
-        b_T = -1/bt
+        b_T = -1 / bt
         J = a_T @ z + b_T * v
         return J
 
     def calc_P_r(self, at, bt):
         P, A, B, Q = self.P, self.A, self.B, self.Q
         P_new = np.zeros(np.shape(P))
-        r_new = -np.array([[0.]*self.n]).T
-        Rinv = (-1/self.R)
+        r_new = -np.array([[0.] * self.n]).T
+        Rinv = (-1 / self.R)
 
-        P_dot = P@(B * Rinv * np.transpose(B)) @ P - Q - P@A + np.transpose(A)@P
+        P_dot = P @ (B * Rinv * np.transpose(B)) @ P - Q - P @ A + np.transpose(A) @ P
         r_dot = - np.transpose(A - B * Rinv * np.transpose(B) @ P) @ r_new - at + (P @ B * Rinv) * bt
         P_new = self.dt * P_dot + P_new
         r_new = self.dt * r_dot + r_new
@@ -122,11 +131,11 @@ class MPC:
         # https://sites.wustl.edu/slowfastdynamiccontrolapproaches/cart-pole-system/cart-pole-dynamics-system/
         M, m, l = self.M, self.m, self.l
         g = 9.81  # gravitational constant
-        I = (m * (l**2))/12
-        denominator = 1 / (I*(M+m) + M*m*(l**2))
-        a = denominator * (g * (m**2) * (l**2))
+        I = (m * (l ** 2)) / 12
+        denominator = 1 / (I * (M + m) + M * m * (l ** 2))
+        a = denominator * (g * (m ** 2) * (l ** 2))
         b = denominator * (-g * (M + m))
-        c = denominator * (I + m * (l**2))
+        c = denominator * (I + m * (l ** 2))
         d = denominator * (-m * l)
         return a, b, c, d
 
@@ -145,7 +154,7 @@ class MPC:
     def cart_pole_dyn(self, X, U):
         # Cart pole dynamics should take state x(t) and u(t) and return array corresponding to dynamics
         A, B = self.A, self.B
-        Xdot = A@X + B*U
+        Xdot = A @ X + B * U
         return Xdot
 
     def integrate(self, xi, ui):
@@ -171,8 +180,8 @@ class MPC:
         hk = self.hk_values[self.__k_str(k)]
         dfk = np.zeros(np.shape(x_t))
         for i in range(len(x_t)):
-            ki = (k[i] * np.pi)/self.L[i][1]
-            dfk[i] = (1/hk) * -ki * np.cos(ki * x_t[i]) * np.sin(ki * x_t[i])
+            ki = (k[i] * np.pi) / self.L[i][1]
+            dfk[i] = (1 / hk) * -ki * np.cos(ki * x_t[i]) * np.sin(ki * x_t[i])
         return dfk
 
     def calc_ck(self, k):
@@ -185,7 +194,7 @@ class MPC:
 
     def calc_at(self):
         self.at = np.zeros((np.shape(self.x_t)))
-        self.__recursive_wrapper(self.K+1, [], self.n, self.__calc_a)
+        self.__recursive_wrapper(self.K + 1, [], self.n, self.__calc_a)
         self.at *= self.q
         return self.at
 
@@ -195,15 +204,15 @@ class MPC:
         ck = self.calc_ck(k)
         phik = self.phik_values[k_str]
         # DFk should be of size (xt), maybe change to matrix addition
-        self.at = ((lambdak * 2 * (ck - phik) * (1/self.tf)) * self.calc_DFk(k)) + self.at
+        self.at = ((lambdak * 2 * (ck - phik) * (1 / self.tf)) * self.calc_DFk(k)) + self.at
 
     def calc_b(self):
         u, R = self.u, self.R
         try:
-            ut = (-1/u)
+            ut = (-1 / u)
         except ZeroDivisionError:
             ut = np.NINF
-        return ut*R
+        return ut * R
 
     def __recursive_wrapper(self, K, k_arr, n, f):
         # When calling this function, call with K+1

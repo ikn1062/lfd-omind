@@ -11,7 +11,7 @@ def main():
         demonstration = np.hstack((demonstration[:, 2:], demonstration[:, :2]))
         D.append(demonstration)
     E, K, dt = [1, -1, -1, -1, -1, -1, 1, -1, -1], 6, 0.01
-    L = [[-np.pi, np.pi], [-11, 11], [-15, 15], [-15, 15]]
+    L = [[-15, 15], [-15, 15], [-np.pi, np.pi], [-11, 11]]
     ergodic_test = ErgodicHelper(D, E, K, L, dt)
     hk, lambdak, phik = ergodic_test.calc_fourier_metrics()
 
