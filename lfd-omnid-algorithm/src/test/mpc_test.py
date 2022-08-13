@@ -8,7 +8,7 @@ def test_mpc_init(mpc):
     assert n == 4, f"dimensions for input should be 4, got: {n}"
     at, bt = mpc.at, mpc.bt
     assert len(at) == 4, f"dimensions for at should be 4, got: {len(at)}"
-    assert bt == 0, f"dimensions for bt should be 4, got: {bt}"
+    assert len(bt) == 2, f"dimensions for bt should be 4, got: {len(bt)}"
     # lambdak = mpc.lambdak_values
     # assert lambdak["1234"] == lambdak_in["1234"], f"dimensions for lambdak should be the same, got: {lambdak['1234']}"
     print("test_mpc_init pass")
@@ -42,19 +42,32 @@ def test_dynamics_2(mpc):
     x_dot_eps = 0.01 * np.ones((np.shape(x)))
     assert (abs(x_dot - mpc_x_dot) < x_dot_eps).all, f"Matrix B is wrong, got: {mpc_x_dot}"
 
-    dt = 0.1
+    dt = 0.01
     x_new = x + x_dot*dt
     mpc_x_new = mpc.integrate(x, u)
     assert (abs(x_new - mpc_x_new) < x_dot_eps).all, f"Matrix B is wrong, got: {mpc_x_new}"
     print("test_dynamics_2 pass")
 
 
+def test_make_trajec(mpc):
+    print("start test_make_trajec")
+    x = np.array([[1], [0], [3.14], [0]])
+    u = np.array([[32], [32]])
+    ti, ti_ts = 0, 0.01
+    x_traj = mpc.make_trajectory(x, u, ti, ti_ts)
+    assert np.shape(x_traj) == (2, 4), f"(2,4) should be of size x trajec, got {np.shape(x_traj)}"
+    print("test_make_trajec pass")
+
+
 def test_ck_DFk(mpc):
     print("start test_ck_DFk")
-    mpc.x_t = np.array([[1], [0], [3.14], [0]])
+    # x_t may need to be 2d, but algorithm doesnt support this for the mpc
+    # mpc.x_t = np.array([[1], [0], [3.14], [0]])
+    mpc.x_t = np.array([[1., 0., 3.14, 0.],
+                        [1.00139442, 0.27888066, 3.13979942, -0.04011664]])
     k = np.array([0, 2, 2, 1])
     mpc_dfk = mpc.calc_DFk(k)
-    assert len(mpc_dfk) == 4, f"dfk should be of size xt, got {len(mpc_dfk)}"
+    assert np.shape(mpc_dfk) == (2, 4), f"dfk should be of size xt, got {np.shape(mpc_dfk)}"
     assert mpc_dfk.any(), f"dfk should return value, got {mpc_dfk}"
 
     ck = mpc.calc_ck(k)
@@ -64,36 +77,39 @@ def test_ck_DFk(mpc):
 
 def test_at_bt(mpc):
     print("start test_at_bt")
-    mpc.x_t = np.array([[1], [0], [3.14], [0]])
-
+    mpc.x_t = np.array([[1., 0., 3.14, 0.],
+                        [1.00139442, 0.27888066, 3.13979942, -0.04011664]])
     at = mpc.calc_at()
-    assert len(at) == 4, f"at should be of size xt, got {len(at)}"
+    assert np.shape(at) == (2, 4), f"at should be of size xt, got {np.shape(at)}"
     assert at.any(), f"at should return value, got {at}"
 
-    mpc.u = 32
+    mpc.u = np.array([[32], [32]])
     bt = mpc.calc_b()
-    u, R = 32, 2
-    utR = (-1/u)*R
+    u = np.array([32])
+    R = 2
+    utR = [u * R, u * R]
     utR_eps = 0.01
-    assert bt, f"at should return value, got {bt}"
-    assert abs(utR - bt) < utR_eps, f"Matrix bt is wrong, got: {bt}"
+    assert bt.any(), f"bt should return value, got {bt}"
+    assert (abs(utR - bt) < utR_eps).all(), f"Matrix bt is wrong, got: {bt}"
     print("test_at_bt pass")
 
 
 def test_desc_dir(mpc):
     print("start test_P_r")
-    mpc.x_t, mpc.u = np.array([[1], [0], [3.14], [0]]), 32
+    mpc.x_t = np.array([[1., 0., 3.14, 0.],
+                        [1.00139442, 0.27888066, 3.13979942, -0.04011664]])
+    mpc.u = np.array([[32], [32]])
     at, bt = mpc.calc_at(), mpc.calc_b()
     P, r = mpc.calc_P_r(at, bt)
-    assert np.shape(P) == (4, 4), f"P should have shape 4,4, but got {np.shape(P)}"
-    assert np.shape(r) == (4, 1), f"r should have shape 4,1, but got {np.shape(r)}"
+    assert np.shape(P) == (2, 4, 4), f"P should have shape 4,4, but got {np.shape(P)}"
+    assert np.shape(r) == (2, 4, 1), f"r should have shape 4,1, but got {np.shape(r)}"
 
     zeta = mpc.desc_dir(P, r, bt)
-    assert np.shape(zeta[0]) == (4, 1), f"z should have shape 4,1, but got {np.shape(zeta[0])}"
-    assert np.shape(zeta[1]) == (1, 1), f"v should have shape 1,1 but got {np.shape(zeta[1])}"
+    assert np.shape(zeta[0][0]) == (4, 1), f"z should have shape 4,1, but got {np.shape(zeta[0])}"
+    assert np.shape(zeta[1][1]) == (1, 1), f"v should have shape 1,1 but got {np.shape(zeta[1])}"
 
     J = mpc.DJ(zeta, at, bt)
-    assert np.shape(J) == (1, 1), f"J should have shape 1,1 but got {np.shape(J)}"
+    assert J, f"J should return value, got {J}"
     print("test_P_r pass")
 
 
@@ -107,27 +123,22 @@ if __name__ == "__main__":
     t0, tf = 0, 30
     mpc_model = MPC(x0, t0, tf, L, hk, phik, lambdak)
 
-
     print("Start MPC test")
     test_mpc_init(mpc_model)
     test_dynamics_1(mpc_model)
     test_dynamics_2(mpc_model)
-
+    test_make_trajec(mpc_model)
 
     D = []
     for i in range(1, 7):
         D.append(np.genfromtxt(f'src/cartpole_gazebo/dynamics/test{i}.csv', delimiter=','))
     E, K, dt = [1, -1, -1, -1, -1, -1], 2, 0.01
-    # E, K, dt = [1, -1, -1, -1, -1, -1], 6, 0.01
     ergodic_test = ErgodicHelper(D, E, K, L, dt)
     print("Getting Ergodic Helpers")
     hk, lambdak, phik = ergodic_test.calc_fourier_metrics()
     mpc_model_1 = MPC(x0, t0, tf, L, hk, phik, lambdak, dt=dt, K=K)
 
-
     test_ck_DFk(mpc_model_1)
     test_at_bt(mpc_model_1)
     test_desc_dir(mpc_model_1)
-
-
 

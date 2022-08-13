@@ -24,7 +24,6 @@ def cartpole_state(msg: JointState):
     cartpole_state = [pos_x, vel_x, theta, theta_dot]
 
 
-
 class CartPoleAgent:
     def __init__(self):
         np.random.seed(42)
