@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import time
 
 
 class MPC:
@@ -11,20 +12,21 @@ class MPC:
 
         # Initialize x_t and u_t variables
         self.u = np.array([[0], [0]])
-        self.x_t = x0
+        self.x0 = np.transpose(x0)
+        self.x_t = np.transpose(x0)
 
         # Control Constants
         self.K = K
-        self.q = 10
-        self.R = 2
+        self.q = 100
+        self.R = 10
         # self.Q = 10*np.eye(self.n, dtype=float)
-        self.Q = np.array([[1, 0, 0, 0],
-                           [0, 1, 0, 0],
+        self.Q = np.array([[10, 0, 0, 0],
+                           [0, 10, 0, 0],
                            [0, 0, 10, 0],
                            [0, 0, 0, 10]])
         # self.P = 10 * np.eye(self.n)  # P(t) is P1
-        self.P = 10 * np.array([[0.01, 0, 0, 0],
-                                [0, 0.01, 0, 0],
+        self.P = 10 * np.array([[0.1, 0, 0, 0],
+                                [0, 0.1, 0, 0],
                                 [0, 0, 1, 0],
                                 [0, 0, 0, 1]])
         self.L = L
@@ -48,83 +50,55 @@ class MPC:
 
     def grad_descent(self):
         gamma = self.beta
-        t0 = self.t0
-
-        output_x, output_u = [], []
+        t0, dt = self.t0, self.dt
+        self.x_t = self.make_trajectory(self.x0, self.u, t0, t0+dt)
 
         while t0 < self.tf:
+            print("New loop")
+            print(f"x_trajec: {self.x_t}")
             at, bt = self.calc_at(), self.calc_b()
             listP, listr = self.calc_P_r(at, bt)
             zeta = self.desc_dir(listP, listr, bt)
-
-            v = zeta[:][1]
-            self.u = self.u + gamma * v
-            if self.u > 200:
-                self.u = 200
-            if self.u < -200:
-                self.u = -200
-
-            self.x_t = self.integrate(self.x_t, self.u)
-
-            while self.x_t[2] < 0:
-                self.x_t[2] += 2 * np.pi
-            while self.x_t[2] > 2 * np.pi:
-                self.x_t[2] -= 2 * np.pi
-            if self.x_t[2] > np.pi:
-                self.x_t[2] -= 2 * np.pi
-
-            output_x.append(self.x_t)
-            output_u.append(self.u)
-            print(f"x: {self.x_t}, u: {self.u}")
-            print(f"DJ: {self.DJ(zeta, at, bt)}")
+            DJ = self.DJ(zeta, at, bt)
+            print(f"DJ: {DJ}")
+            v = zeta[1]
+            u_new = self.u + gamma * v
+            print(f"u_new: {u_new}")
+            self.x_t = self.make_trajectory(self.x_t[1], u_new, t0, t0+dt)
 
             t0 += self.dt
 
-        output_x = np.array(output_x)
-        output_u = np.array(output_u)
-        t = np.arange(self.t0, self.tf + self.dt, self.dt)
-        plt.plot(t, output_x[:, 0])
-        plt.show()
-        plt.plot(t, output_x[:, 1])
-        plt.show()
-        plt.plot(t, output_x[:, 2])
-        plt.show()
-        plt.plot(t, output_x[:, 3])
-        plt.show()
-        plt.plot(t, output_u[:, 0])
-        plt.show()
         return 0
 
     def make_trajectory(self, xt, u, ti, tf):
         # Creates a trajectory given initial state and controls
-        t = np.arange(ti, tf, self.dt)
-        x_traj = np.zeros((len(t) + 1, len(xt)))
+        x_traj = np.zeros((len(u), len(xt)))
         x_traj[0, :] = np.transpose(xt[:])
-        for i in range(1, len(t) + 1):
-            xt_1 = self.integrate(x_traj[i - 1, :], u[i, :])
+        for i in range(1, len(u)):
+            xt_1 = self.integrate(x_traj[i - 1, :], u[i-1])
             x_traj[i, :] = np.transpose(xt_1)
         return x_traj
 
     def desc_dir(self, listP, listr, bt):
         A, B = self.A, self.B
-        z = np.array([[0.0] * self.n]).T
+        z = np.zeros((np.shape(self.x_t)))
+        v = np.zeros((np.shape(bt)))
         Rinv = (-1 / self.R)
-        zeta = []
         for i in range(len(bt)):
             P, r, b = listP[i], listr[i], bt[i]
-            v = -Rinv * np.transpose(B) @ P @ z - Rinv * np.transpose(B) @ r - Rinv * b
-            zeta.append((z, v))
-            zdot = A @ z + B @ v
-            z += zdot * self.dt
+            v[i] = -Rinv * np.transpose(B) @ P @ z[i] - Rinv * np.transpose(B) @ r - Rinv * b
+            zdot = A @ z[i] + B @ v[i]
+            z[i] += zdot * self.dt
+        zeta = (z, v)
         return zeta
 
     def DJ(self, zeta, at, bt):
         J = np.zeros((len(zeta)))
+        z, v = zeta[0], zeta[1]
         for i in range(len(zeta)):
-            z, v = zeta[i][0], zeta[i][1]
             a_T = np.transpose(at[i])
             b_T = np.transpose(bt[i])
-            J_val = a_T @ z + b_T @ v
+            J_val = a_T @ z[i] + b_T @ v[i]
             J[i] = J_val
         J_integral = np.trapz(J, dx=self.dt)
         return J_integral
@@ -132,6 +106,7 @@ class MPC:
     def calc_P_r(self, at, bt):
         P, A, B, Q = self.P, self.A, self.B, self.Q
         dim_len = len(at)
+        print(dim_len)
         listP, listr = np.zeros((dim_len, self.n, self.n)), np.zeros((dim_len, self.n, 1))
         listP[0] = np.zeros(np.shape(P))
         listr[0] = -np.array([[0.] * self.n]).T

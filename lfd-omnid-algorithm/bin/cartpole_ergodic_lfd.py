@@ -17,7 +17,7 @@ def main():
 
     print("Starting Grad Descent")
 
-    x0 = np.array([[0], [0], [-np.pi], [0]])
+    x0 = [0, 0, -np.pi, 0]
     t0, tf = 0, 15
 
     mpc_model_1 = MPC(x0, t0, tf, L, hk, phik, lambdak, dt=dt, K=K)

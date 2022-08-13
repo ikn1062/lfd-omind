@@ -105,12 +105,18 @@ def test_desc_dir(mpc):
     assert np.shape(r) == (2, 4, 1), f"r should have shape 4,1, but got {np.shape(r)}"
 
     zeta = mpc.desc_dir(P, r, bt)
-    assert np.shape(zeta[0][0]) == (4, 1), f"z should have shape 4,1, but got {np.shape(zeta[0])}"
-    assert np.shape(zeta[1][1]) == (1, 1), f"v should have shape 1,1 but got {np.shape(zeta[1])}"
+    assert np.shape(zeta[0]) == (2, 4), f"z should have shape 4,1, but got {np.shape(zeta[0])}"
+    assert np.shape(zeta[1]) == (2, 1), f"v should have shape 1,1 but got {np.shape(zeta[1])}"
 
     J = mpc.DJ(zeta, at, bt)
     assert J, f"J should return value, got {J}"
     print("test_P_r pass")
+
+
+def test_grad_descent(mpc):
+    print("start test_grad_descent")
+    mpc.grad_descent()
+    print("test_grad_descent pass")
 
 
 if __name__ == "__main__":
@@ -119,15 +125,15 @@ if __name__ == "__main__":
     hk, phik, lambdak = {}, {}, {}
 
     print("Get MPC model - no ergodic variables")
-    x0 = [-np.pi, 0, 0, 0]
+    x0 = [0, 0, -np.pi, 0]
     t0, tf = 0, 30
     mpc_model = MPC(x0, t0, tf, L, hk, phik, lambdak)
 
     print("Start MPC test")
-    test_mpc_init(mpc_model)
-    test_dynamics_1(mpc_model)
-    test_dynamics_2(mpc_model)
-    test_make_trajec(mpc_model)
+    #test_mpc_init(mpc_model)
+    #test_dynamics_1(mpc_model)
+    #test_dynamics_2(mpc_model)
+    #test_make_trajec(mpc_model)
 
     D = []
     for i in range(1, 7):
@@ -138,7 +144,10 @@ if __name__ == "__main__":
     hk, lambdak, phik = ergodic_test.calc_fourier_metrics()
     mpc_model_1 = MPC(x0, t0, tf, L, hk, phik, lambdak, dt=dt, K=K)
 
-    test_ck_DFk(mpc_model_1)
-    test_at_bt(mpc_model_1)
-    test_desc_dir(mpc_model_1)
+    #test_ck_DFk(mpc_model_1)
+    #test_at_bt(mpc_model_1)
+    #test_desc_dir(mpc_model_1)
+
+    mpc_model_2 = MPC(x0, t0, tf, L, hk, phik, lambdak, dt=dt, K=K)
+    test_grad_descent(mpc_model_2)
 
