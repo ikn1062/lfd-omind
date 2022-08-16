@@ -6,11 +6,12 @@ def main():
     print("Calculate Ergodic Helpers")
 
     D = []
-    for i in range(1, 10):
+    for i in range(1, 9):
         demonstration = np.genfromtxt(f'src/cartpole_gazebo/dynamics/test{i}.csv', delimiter=',')
         demonstration = np.hstack((demonstration[:, 2:], demonstration[:, :2]))
+        print(demonstration[0, :])
         D.append(demonstration)
-    E, K, dt = [1, -1, -1, -1, -1, -1, 1, -1, -1], 6, 0.01
+    E, K, dt = [1, -1, -1, -1, -1, -1, -1, -1], 6, 0.01
     L = [[-15, 15], [-15, 15], [-np.pi, np.pi], [-11, 11]]
     ergodic_test = ErgodicHelper(D, E, K, L, dt)
     hk, lambdak, phik = ergodic_test.calc_fourier_metrics()
