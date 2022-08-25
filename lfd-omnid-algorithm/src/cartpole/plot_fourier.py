@@ -1,51 +1,46 @@
-import matplotlib.pyplot as plt
+from .ergodic_helper import ErgodicHelper
 import numpy as np
+import matplotlib.pyplot as plt
 
 
-def plot_trajec(show_info=True, show_trajec=True):
+def get_phix(x, K, phik_dict, ergodic_helper):
+    # Negative Euler Identity? Multiply by 2 for real function?
+    phix = 0
+    for ki in range(K):
+        for kj in range(K):
+            k_str = f"{ki}{kj}"
+            phik = phik_dict[k_str]
+            fk = ergodic_helper.calc_Fk(x, [ki, kj])
+            phix += phik * fk
+    phix *= 2
+    return phix
+
+
+def fourier_plot_2dim():
+    num_trajec = 1
+
+    K = 10
+    L = [[-np.pi, np.pi], [-11, 11]]
+    dt = 0.01
+    E = [1, -1, -1, -1, -1, -1, -1, -1]
     D = []
-    for i in range(1, 9):
+    for i in range(num_trajec):
         demonstration = np.genfromtxt(f'src/cartpole_gazebo/dynamics/test{i}.csv', delimiter=',')
         D.append(demonstration)
-    E = [1, -1, -1, -1, -1, -1, -1, -1]
+    D = [np.array(d)[:, :2] for d in D]
+    E = E[:num_trajec]
 
-    if show_trajec:
-        for i in range(len(D)):
-            if E[i] == 1:
-                plt.plot(D[i][:, 0], D[i][:, 1], 'bo', markersize=0.2, linestyle='None')
-            else:
-                plt.plot(D[i][:, 0], D[i][:, 1], 'r+', markersize=0.2, linestyle='None')
+    ergodic_helper = ErgodicHelper(D, E, K, L, dt)
+    _, phik_dict, _ = ergodic_helper.calc_fourier_metrics()
 
-    if show_info:
-        sizet, sizetd = 15, 30
-        bin_theta = np.linspace(-3.14, 3.14, sizet)
-        bin_thetadot = np.linspace(-20, 20, sizetd)
-        contour_count = np.zeros((sizetd + 1, sizet + 1))
+    x = np.linspace(-np.pi, np.pi, 50)
+    y = np.linspace(-15, 15, 50)
+    z = np.array([get_phix([i, j], K, phik_dict, ergodic_helper) for j in y for i in x])
+    Z = z.reshape(50, 50)
 
-        for i in range(len(D)):
-            digitize_theta = np.digitize(D[i][:, 0], bin_theta)
-            digitize_thetadot = np.digitize(D[i][:, 1], bin_thetadot)
-            trajec_len = len(D[i])
-            for ii in digitize_theta:
-                for jj in digitize_thetadot:
-                    contour_count[jj][ii] += (1/trajec_len) * E[i]
-
-        for i, row in enumerate(contour_count):
-            for j, val in enumerate(row):
-                if val > 10:
-                    contour_count[i, j] = np.log10(val)
-                elif val < -10:
-                    contour_count[i, j] = -1 * np.log10(abs(val))
-                print(row)
-
-        # contour_count = contour_count[1:, 1:]
-        bin_theta = np.linspace(-3.14, 3.14, sizet+1)
-        bin_thetadot = np.linspace(-20, 20, sizetd+1)
-
-        # Blue is good, red is bad
-        plt.contourf(bin_theta, bin_thetadot, contour_count, 100, cmap='RdBu', vmin=-6, vmax=6)
+    plt.imshow(Z, interpolation='bilinear', vmin=-0.1, vmax=0.5)
     plt.show()
 
 
 if __name__ == "__main__":
-    plot_trajec()
+    fourier_plot_2dim()
