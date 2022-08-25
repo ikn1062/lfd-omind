@@ -4,7 +4,7 @@ import time
 
 
 class MPC:
-    def __init__(self, x0, t0, tf, L, hk, phik, lambdak, dt=0.01, K=6):
+    def __init__(self, x0, t0, tf, L, hk, phik, lambdak, dt=0.01, K=6, max_u=100):
         # System variables
         self.n = len(x0)
         self.t0, self.tf = t0, tf
@@ -12,6 +12,7 @@ class MPC:
 
         # Initialize x_t and u_t variables
         self.u = np.array([[0], [0]])
+        self.max_u = max_u
         self.x0 = np.transpose(x0)
         self.x_t = np.transpose(x0)
 
@@ -53,21 +54,42 @@ class MPC:
         t0, dt = self.t0, self.dt
         self.x_t = self.make_trajectory(self.x0, self.u, t0, t0+dt)
 
+        t = np.arange(self.t0, self.tf + 2 * self.dt, self.dt)
+        x_values = np.zeros((len(t), self.n))
+        u_values = np.zeros((len(t), 1))
+
+        x_values[0, :] = self.x_t[1, :]
+        u_values[0] = self.u[0]
+
+        ii = 1
         while t0 < self.tf:
             print("New loop")
-            print(f"x_trajec: {self.x_t}")
+            print(f"x_trajec:\n {self.x_t}")
             at, bt = self.calc_at(), self.calc_b()
             listP, listr = self.calc_P_r(at, bt)
             zeta = self.desc_dir(listP, listr, bt)
             DJ = self.DJ(zeta, at, bt)
-            print(f"DJ: {DJ}")
+            print(f"DJ:\n {DJ}")
             v = zeta[1]
             u_new = self.u + gamma * v
-            print(f"u_new: {u_new}")
+            print(f"u_new:\n {u_new}")
             self.x_t = self.make_trajectory(self.x_t[1], u_new, t0, t0+dt)
 
-            t0 += self.dt
+            x_values[ii, :] = self.x_t[1, :]
+            u_values[ii] = u_new[1]
 
+            t0 += self.dt
+            ii += 1
+
+        fig, axs = plt.subplots(2, 2)
+        axs[0, 0].plot(t, x_values[:, 0])
+        axs[0, 1].plot(t, x_values[:, 1])
+        axs[1, 0].plot(t, x_values[:, 2])
+        axs[1, 1].plot(t, x_values[:, 3])
+        plt.show()
+
+        plt.plot(t, u_values)
+        plt.show()
         return 0
 
     def make_trajectory(self, xt, u, ti, tf):
