@@ -24,7 +24,7 @@ class ErgodicHelper:
 
     def calc_fourier_metrics(self):
         self.__recursive_wrapper(self.K + 1, [], self.n, self.calc_phik)
-        self.__recursive_wrapper(self.K+1, [], self.n, self.calc_lambda_k)
+        self.__recursive_wrapper(self.K + 1, [], self.n, self.calc_lambda_k)
         return self.hk_values, self.phik_values, self.lambdak_values
 
     def calc_Fk(self, x, k):
