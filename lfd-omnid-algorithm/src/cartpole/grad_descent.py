@@ -4,7 +4,7 @@ import time
 
 
 class MPC:
-    def __init__(self, x0, t0, tf, L, hk, phik, lambdak, dt=0.01, K=6, max_u=100):
+    def __init__(self, x0, t0, tf, L, hk, phik, lambdak, dt=0.01, K=6, max_u=100, rospy_pub=None):
         # System variables
         self.n = len(x0)
         self.t0, self.tf = t0, tf
@@ -49,6 +49,9 @@ class MPC:
         self.lambdak_values = lambdak
         self.ck_values = {}
 
+        # Set up Rospy Publisher
+        self.rospy_pub = rospy_pub
+
     def grad_descent(self):
         gamma = self.beta
         t0, dt = self.t0, self.dt
@@ -72,6 +75,8 @@ class MPC:
             print(f"DJ:\n {DJ}")
             v = zeta[1]
             u_new = self.u + gamma * v
+            if self.rospy_pub:
+                self.rospy_pub.publish(u_new[1, 0])
             print(f"u_new:\n {u_new}")
             self.x_t = self.make_trajectory(self.x_t[1], u_new, t0, t0+dt)
 
@@ -128,7 +133,6 @@ class MPC:
     def calc_P_r(self, at, bt):
         P, A, B, Q = self.P, self.A, self.B, self.Q
         dim_len = len(at)
-        print(dim_len)
         listP, listr = np.zeros((dim_len, self.n, self.n)), np.zeros((dim_len, self.n, 1))
         listP[0] = np.zeros(np.shape(P))
         listr[0] = -np.array([[0.] * self.n]).T
@@ -241,5 +245,6 @@ class MPC:
         else:
             f(k_arr)
 
-    def __k_str(self, k):
+    @staticmethod
+    def __k_str(k):
         return ''.join(str(i) for i in k)
