@@ -6,15 +6,18 @@ def main():
     print("Getting Demonstrations")
     num_trajectories = 13
 
-    demonstration_list = [0, 6, 7, 10, 11, 12]
+    # demonstration_list = [0, 6, 7, 10, 11, 12]
+    demonstration_list = [0]
 
     D = []
-    E, new_E = [-1, -1, -1, -1, -1, -1, 1, 1, 1, -1, -1, -1], []
+    # E, new_E = [-1, -1, -1, -1, -1, -1, 1, 1, 1, -1, -1, -1], []
+    E, new_E = [1, -1, -1, -1, -1, -1, 1, 1, 1, -1, -1, -1], []
     for i in range(num_trajectories):
         if i not in demonstration_list:
             continue
         new_E.append(E)
         demonstration = np.genfromtxt(f'src/cartpole_gazebo/dynamics/test{i}.csv', delimiter=',')
+        demonstration[:, 0] = np.pi - np.abs(demonstration[:, 0])
         demonstration = np.hstack((demonstration[:, 2:], demonstration[:, :2]))
         D.append(demonstration)
 
@@ -28,7 +31,7 @@ def main():
 
     print("Starting Grad Descent")
 
-    x0 = [0, 0, -np.pi, 0]
+    x0 = [0, 0, 0, 0]
     t0, tf = 0, 15
 
     mpc_model_1 = MPC(x0, t0, tf, L, hk, phik, lambdak, dt=dt, K=K)
