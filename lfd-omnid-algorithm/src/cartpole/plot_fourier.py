@@ -17,13 +17,13 @@ def get_phix(x, K, phik_dict, ergodic_helper):
 
 
 def fourier_plot_2dim():
-    num_trajec = 13
-    demonstration_list = [0, 6, 7, 10, 11, 12]
+    num_trajec = 14
+    demonstration_list = [0, 13]
 
-    K = 8
+    K = 4
     L = [[-np.pi, np.pi], [-11, 11]]
     dt = 0.01
-    E = [-1, -1, -1, -1, -1, -1, 1, 1, 1, -1, -1, -1, -1]
+    E = [-1, -1, -1, -1, -1, -1, 1, 1, 1, -1, -1, -1, -1, 1]
     new_E = []
     D = []
     for i in range(num_trajec):
@@ -31,6 +31,7 @@ def fourier_plot_2dim():
             continue
         new_E.append(E[i])
         demonstration = np.genfromtxt(f'src/cartpole_gazebo/dynamics/test{i}.csv', delimiter=',')
+        demonstration[:, 0] = np.pi - np.abs(demonstration[:, 0])
         D.append(demonstration)
     D = [np.array(d)[:, :2] for d in D]
     # E = E[:num_trajec]
