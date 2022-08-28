@@ -3,7 +3,7 @@
 
   
   <!-- run publisher and subscriber nodes from scripts -->
-  <node name="pole_dyn" pkg="cartpole_gazebo" type="pole_dyn.py" respawn="false" output="log" />
+  <node name="cartpole_trajectories" pkg="cartpole_gazebo" type="cartpole_trajectories.py" respawn="false" output="log" />
   <node name="key_control_cart" pkg="cartpole_gazebo" type="key_control_cart.py" respawn="false" output="screen" />
 
 
