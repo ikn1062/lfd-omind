@@ -82,6 +82,7 @@ class controlleriLQR:
             u_new = self.u + gamma * v
 
             if self.rospy_pub:
+                rospy.loginfo(u_new[1, 0])
                 self.rospy_pub.publish(u_new[1, 0])
 
             print(f"u_new:\n {u_new}")
