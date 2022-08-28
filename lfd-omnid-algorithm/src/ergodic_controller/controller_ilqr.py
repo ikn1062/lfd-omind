@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 from time import sleep
 
 
-class iLQR_mpc:
+class controlleriLQR:
     def __init__(self, x0, t0, tf, L, hk, phik, lambdak, A, B, dt=0.01, K=6, max_u=100, rospy_pub=None):
         # System variables
         self.n = len(x0)

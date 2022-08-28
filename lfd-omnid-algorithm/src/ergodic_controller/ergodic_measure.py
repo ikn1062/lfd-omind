@@ -1,7 +1,7 @@
 import numpy as np
 
 
-class ErgodicHelper:
+class ErgodicMeasure:
     def __init__(self, D, E, K, L, dt):
         """
         Ergodic Helper Class to calculate the following metrics:
@@ -56,14 +56,14 @@ class ErgodicHelper:
         :param k: The series coefficient given as a list of length dimensions (list)
         :return: Fk Value (float)
         """
-        hk = self.calc_hk(k)
+        hk = self.__calc_hk(k)
         fourier_basis = 1
         for i in range(len(x)):
             fourier_basis *= np.cos((k[i]*np.pi*x[i])/(self.L[i][1] - self.L[i][0]))
         Fk = (1/hk)*fourier_basis
         return Fk
 
-    def calc_hk(self, k):
+    def __calc_hk(self, k):
         """
         Normalizing factor for Fk
 
@@ -86,7 +86,7 @@ class ErgodicHelper:
         self.hk_values[k_str] = hk
         return hk
 
-    def calc_ck(self, x_t, k):
+    def __calc_ck(self, x_t, k):
         """
         Calculates spacial statistics for a given trajectory and series coefficient value
 
@@ -121,7 +121,7 @@ class ErgodicHelper:
         """
         phik = 0
         for i in range(self.m):
-            phik += self.E[i] * self.w[i] * self.calc_ck(self.D[i], k)
+            phik += self.E[i] * self.w[i] * self.__calc_ck(self.D[i], k)
         k_str = ''.join(str(i) for i in k)
         self.phik_values[k_str] = phik
         # return phik

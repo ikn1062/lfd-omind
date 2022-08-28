@@ -1,16 +1,14 @@
 import numpy as np
-from src.cartpole import ErgodicHelper, iLQR_mpc, LQR_mpc
+from src.ergodic_controller import ErgodicMeasure, controlleriLQR, Plot2DMetric
 
 
 def main():
     print("Getting Demonstrations")
     num_trajectories = 14
 
-    # demonstration_list = [0, 6, 7, 10, 11, 12]
     demonstration_list = [13]
 
     D = []
-    # E, new_E = [-1, -1, -1, -1, -1, -1, 1, 1, 1, -1, -1, -1], []
     E, new_E = [-1, -1, -1, -1, -1, -1, 1, 1, 1, -1, -1, -1, 1], []
     for i in range(num_trajectories):
         if i not in demonstration_list:
@@ -21,12 +19,18 @@ def main():
         demonstration = np.hstack((demonstration[:, 2:], demonstration[:, :2]))
         D.append(demonstration)
 
-    print("Calculating Ergodic Helpers")
-
     K = 6
     dt = 1
     L = [[-15, 15], [-15, 15], [-np.pi, np.pi], [-11, 11]]
-    ergodic_test = ErgodicHelper(D, E, K, L, dt)
+
+    print("Visualize Ergodic Metric")
+    plot_phix_metric = Plot2DMetric(K, L, dt, E, D, 0, 1)
+    plot_phix_metric.visualize_ergodic()
+    plot_phix_metric.visualize_trajectory()
+
+    print("Calculating Ergodic Helpers")
+
+    ergodic_test = ErgodicMeasure(D, E, K, L, dt)
     hk, lambdak, phik = ergodic_test.calc_fourier_metrics()
 
     M, m, l = 20, 20, 0.75
@@ -36,8 +40,8 @@ def main():
     x0 = [0, 0, 0, 0]
     t0, tf = 0, 15
 
-    mpc_model_1 = iLQR_mpc(x0, t0, tf, L, hk, phik, lambdak, A, B, dt=dt, K=K)
-    # mpc_model_1 = LQR_mpc(x0, t0, tf, L, hk, phik, lambdak, A, B, dt=dt, K=K)
+    mpc_model_1 = controlleriLQR(x0, t0, tf, L, hk, phik, lambdak, A, B, dt=dt, K=K)
+    # mpc_model_1 = controllerLQR(x0, t0, tf, L, hk, phik, lambdak, A, B, dt=dt, K=K)
     mpc_model_1.grad_descent()
 
 

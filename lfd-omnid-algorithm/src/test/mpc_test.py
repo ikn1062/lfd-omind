@@ -1,5 +1,5 @@
 import numpy as np
-from src.cartpole import ErgodicHelper, MPC
+from src.ergodic_controller import ErgodicMeasure, MPC
 
 
 def test_mpc_init(mpc):
@@ -139,7 +139,7 @@ if __name__ == "__main__":
     for i in range(1, 7):
         D.append(np.genfromtxt(f'src/cartpole_gazebo/dynamics/test{i}.csv', delimiter=','))
     E, K, dt = [1, -1, -1, -1, -1, -1], 2, 0.01
-    ergodic_test = ErgodicHelper(D, E, K, L, dt)
+    ergodic_test = ErgodicMeasure(D, E, K, L, dt)
     print("Getting Ergodic Helpers")
     hk, lambdak, phik = ergodic_test.calc_fourier_metrics()
     mpc_model_1 = MPC(x0, t0, tf, L, hk, phik, lambdak, dt=dt, K=K)
