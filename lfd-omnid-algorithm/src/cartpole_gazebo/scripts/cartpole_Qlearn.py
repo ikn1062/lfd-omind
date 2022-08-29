@@ -13,7 +13,14 @@ from gazebo_msgs.srv import GetModelState
 cartpole_state = [0, 0, pi, 0]
 
 
-def cartpole_state_func(msg: JointState):  
+def cartpole_state_func(msg: JointState):
+    """
+    Gets the current cartpole state from the cartpole system from the node /cart_pole/joint_states
+    - Updates cartpole_state global variable to the current state
+
+    :param msg: The current joint state from the model (JointState)
+    :return: None
+    """
     global cartpole_state  
     theta, theta_dot = msg.position[0], msg.velocity[0]
     pos_x, vel_x = msg.position[1], msg.velocity[1]
@@ -47,7 +54,7 @@ class CartPoleAgent:
         self.cartpole_state = cartpole_state
 
         # Q table and buckets
-        # [position, velocity, angle, angular velocity]
+        # Position state vector x: [position, velocity, angle, angular velocity]
         self.buckets = (1, 1, 12, 12)
         self.upper_bounds = [15, 200, np.pi, 11]
         self.lower_bounds = [-15, -200, -np.pi, -11]
@@ -64,6 +71,14 @@ class CartPoleAgent:
         self.update_flag = True
 
     def train(self):
+        """
+        Function called to train the Qlearning agent
+        Calls in 2 threads:
+        - Update state of cartpole system to current state
+        - Qlearning training
+
+        :return: None
+        """
         update_state_thread = self.update_state()
         qlearning_thread = self.qlearning()
         qlearning_thread.join()
@@ -71,16 +86,19 @@ class CartPoleAgent:
 
     @Decorators.thread_decorator
     def qlearning(self):
-        print("start trianing")
-        model_coordinates = rospy.ServiceProxy( '/gazebo/get_model_state', GetModelState)
-        rospy.wait_for_service('/gazebo/get_model_state')
-        print(model_coordinates("robot", "pole"))
+        """
+        QLearning training agent
+
+        :return: None
+        """
+        print("Start Training")
         for e in range(self.n_episodes):
-            print(e)
+            # Gets the current discretized state of the updated cartpole state
             state = self.__discretize_state(self.cartpole_state)
             alpha = exploration_rate = self.__rate(e)
             done = False
-            iter = 0
+            ii = 0
+
             while not done:
                 # Choose action based on ep_greedy_policy
                 action = self.__choose_action(exploration_rate, state)
@@ -88,13 +106,13 @@ class CartPoleAgent:
                 time.sleep(0.01)
                 # get new state, reward, and end-signal
                 new_state = self.cartpole_state[:]
-                done, reward = self.check_state(new_state, iter)
+                done, reward = self.check_state(new_state, ii)
                 new_state = self.__discretize_state(new_state)
                 # Update Q table
                 self.__update_q(state, action, reward, alpha, new_state)
                 state = new_state
-                iter += 1
-                
+                ii += 1
+
             pub.publish(0)
             rospy.wait_for_service('/gazebo/reset_simulation')
             reset_world = rospy.ServiceProxy('/gazebo/reset_simulation', Empty)
@@ -104,8 +122,14 @@ class CartPoleAgent:
         print("finished training")
 
     def __choose_action(self, exploration_rate, state):
+        """
+        Samples a random action given the environment, returns a positive or negative force
+
+        :param exploration_rate: Current exploration rate of the system (float)
+        :param state: Current discritized state - position vector of state (np array of shape (1, 4))
+        :return: Action - Force applied to system (int)
+        """
         if np.random.random() < exploration_rate:
-            # Samples a random action given the environment, returns a positive or negative force
             state_rand = np.random.random()
             if state_rand < 0.5:
                 return 0
@@ -115,10 +139,21 @@ class CartPoleAgent:
             return np.argmax(self.Qtable[state])
 
     def __rate(self, e):
+        """
+        Current exploration state
+
+        :param e: Episode number (int)
+        :return: Exploration Rate (float)
+        """
         return max(self.min_lr, min(1., 1. - np.log10((e + 1) / self.decay_rate)))
 
     def __discretize_state(self, state):
-        # The upper and the lower bounds for the discretization
+        """
+        Takes the state and discritizes it using scaled bins
+
+        :param state: Current discritized state of the cartpole system - position vector of x (np array (1, 4))
+        :return: Discritized position vector state (tuple)
+        """
         discretized = list()
         for i in range(len(state)):
             scaling = (state[i] + abs(self.lower_bounds[i])) / (self.upper_bounds[i] - self.lower_bounds[i])
@@ -128,19 +163,43 @@ class CartPoleAgent:
         return tuple(discretized)
 
     def __update_q(self, state, action, r, a, new_state):
+        """
+        Updates q_learning matrix
+
+        :param state: Current discritized state of the cartpole system - position vector of x (np array (1, 4))
+        :param action: Action taken by the agent - Force (Float)
+        :param r: Current reward earned for system - Reward (Float)
+        :param a: The exploration rate for the system (Float)
+        :param new_state: New discritized state of the system - position vector of x (np array (1, 4))
+        :return: None
+        """
         self.Qtable[state][action] = self.Qtable[state][action] + \
                                      a * (r + self.gamma * np.max(self.Qtable[new_state]) - self.Qtable[state][action])
 
     @Decorators.thread_decorator
     def update_state(self):
+        """
+        Gets the next state from the cartpole system
+        - Updates self.cartpole_state
+        :return: None
+        """
         while not rospy.is_shutdown() and self.update_flag:
             self.cartpole_state = cartpole_state
             rospy.sleep(0.1)
 
-    def check_state(self, new_state, iter):
-        print(f"state: {new_state}, iter: {iter}")
+    def check_state(self, new_state, ii):
+        """
+        Checks the current position state of the cartpole system
+
+        :param new_state: New cartpole state as a position vector (np array of shape (1, 4))
+        :param iter: Iteration of Q learning step
+        :return: Termination, Reward (Tuple)
+                Termination - Whether the Q learning Agent should terminate the current episode
+                Reward - Reward for current state
+        """
+        print(f"state: {new_state}, iter: {ii}")
         x, xd, t, td = new_state[0], new_state[1], new_state[2], new_state[3]
-        terminate = bool(x > 10 or x < -10 or xd > 5 or xd < -5 or td > 11 or td < -11 or iter > self.train_iter)
+        terminate = bool(x > 10 or x < -10 or xd > 5 or xd < -5 or td > 11 or td < -11 or ii > self.train_iter)
         if terminate:
             return terminate, 0.0
         reward = 1.0
