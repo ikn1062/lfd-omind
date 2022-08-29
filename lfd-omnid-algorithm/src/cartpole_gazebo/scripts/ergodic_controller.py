@@ -257,15 +257,6 @@ class controlleriLQR:
             t0 += self.dt
             ii += 1
 
-        fig, axs = plt.subplots(2, 2)
-        axs[0, 0].plot(t, x_values[:, 0])
-        axs[0, 1].plot(t, x_values[:, 1])
-        axs[1, 0].plot(t, x_values[:, 2])
-        axs[1, 1].plot(t, x_values[:, 3])
-        plt.show()
-
-        plt.plot(t, u_values)
-        plt.show()
         return 0
 
     def make_trajectory(self, x0, u):
