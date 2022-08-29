@@ -26,6 +26,7 @@ class Plot2DMetric:
         self.dim1, self.dim2 = self.L[dim1], self.L[dim2]
 
         self.E = E
+        D = np.array(D)
         self.D = [np.array(d)[:, [dim1, dim2]] for d in D]
         self.ergodic_measure = ErgodicMeasure(self.D, E, K, L, dt)
         _, self.phik_dict, _ = self.ergodic_measure.calc_fourier_metrics()
@@ -45,6 +46,9 @@ class Plot2DMetric:
         Z = self.__calc_phix()
         plt.imshow(Z, interpolation=self.interpolation, vmin=self.vminmax[0], vmax=self.vminmax[1],
                    extent=[self.dim1[0], self.dim1[1], self.dim2[0], self.dim2[1]], aspect='auto')
+        plt.title('Ergodic Metric Spatial Distribution')
+        plt.xlabel("dim 1")
+        plt.ylabel("dim 2")
         plt.show()
 
     def visualize_trajectory(self, show_trajectory=True, show_information_density=True):
@@ -72,6 +76,9 @@ class Plot2DMetric:
             bin_thetadot = np.linspace(self.dim2[0], self.dim2[1], self.sizexy[1])
 
             plt.contourf(bin_theta, bin_thetadot, contour_count, 100, cmap='RdBu', vmin=-6, vmax=6)
+        plt.title('Spatial information density and trajectories')
+        plt.xlabel("dim 1")
+        plt.ylabel("dim 2")
         plt.show()
 
     def __calc_phix_x(self, x):
