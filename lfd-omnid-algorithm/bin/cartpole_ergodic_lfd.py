@@ -14,7 +14,7 @@ def main():
         if i not in demonstration_list:
             continue
         new_E.append(E)
-        demonstration = np.genfromtxt(f'src/cartpole_gazebo/dynamics/test{i}.csv', delimiter=',')
+        demonstration = np.genfromtxt(f'src/cartpole_gazebo/demonstrations/demo{i}.csv', delimiter=',')
         demonstration[:, 0] = np.pi - np.abs(demonstration[:, 0])
         demonstration = np.hstack((demonstration[:, 2:], demonstration[:, :2]))
         D.append(demonstration)

@@ -39,7 +39,7 @@ def main():
     """
     Creates a subscriber to the cartpole gazebo joint states node to collect cartpole position states over time
 
-    - Saves trajectory in demonstrations/ with demo_name
+    - Saves trajectory in demonstrations/ with demo_number
     :return: None
     """
     rospy.init_node("pole_state_sub")
@@ -47,8 +47,8 @@ def main():
     rospy.loginfo("Pole State Node has been started")
 
     global csv_writer
-    demo_name = "demo1"
-    f = open(f'/home/ishaan/catkin_ws/src/cartpole_gazebo/demonstrations/{demo_name}.csv', 'w')
+    demo_number = 1
+    f = open(f'/home/ishaan/catkin_ws/src/cartpole_gazebo/demonstrations/demo{str(demo_number)}.csv', 'w')
     csv_writer = csv.writer(f)
 
     rospy.spin()
