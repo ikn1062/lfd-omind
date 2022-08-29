@@ -5,6 +5,23 @@ from time import sleep
 
 class controlleriLQR:
     def __init__(self, x0, t0, tf, L, hk, phik, lambdak, A, B, dt=0.01, K=6, max_u=100, rospy_pub=None):
+        """
+        iLQR Controller Class which generates controls for ergodic system in loop
+
+        :param x0: Initial State of position in trajectory (np array of shape (1, 4))
+        :param t0: Starting time of trajectory (int)
+        :param tf: Finish time of trajectory (int)
+        :param L: Size of boundaries for dimensions, listed as [Lower boundary, Higher Boundary] (list)
+        :param hk: Normalizing factor for Fk - generated from ErgodicMeasure Class (dict)
+        :param phik: Spatial Distribution of demonstrations - generated from ErgodicMeasure Class (dict)
+        :param lambdak: Coefficient of Hilbert Space - generated from ErgodicMeasure Class (dict)
+        :param A: A matrix for dynamic system (np array)
+        :param B: B matrix for dynamic system (np array)
+        :param dt: Time difference (float)
+        :param K: Size of series coefficient (int)
+        :param max_u: Max controller force applied to system (float)
+        :param rospy_pub: Rospy Publisher Object (rospy.Publisher object)
+        """
         # System variables
         self.n = len(x0)
         self.t0, self.tf = t0, tf
