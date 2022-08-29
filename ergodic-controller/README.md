@@ -108,6 +108,7 @@ Here is the video of the ergodic metric controller in action using the ROS gazeb
 of a cartpole System
 
 Link here: https://youtu.be/ibh8is8qehY
+
 [![Cartpole Gazebo Ergodic Controller](http://img.youtube.com/vi/ibh8is8qehY/0.jpg)](http://www.youtube.com/watch?v=ibh8is8qehY "Cart-pole Ergodic Controller")
 
 
