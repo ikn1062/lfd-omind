@@ -6,15 +6,15 @@ def main():
     print("Getting Demonstrations")
     num_trajectories = 14
 
-    demonstration_list = [13]
+    demonstration_list = [0]
 
     D = []
-    E, new_E = [-1, -1, -1, -1, -1, -1, 1, 1, 1, -1, -1, -1, 1], []
+    E, new_E = [1, -1, -1, -1, -1, -1, 1, 1, 1, -1, -1, -1, 1, -1], []
     for i in range(num_trajectories):
         if i not in demonstration_list:
             continue
-        new_E.append(E)
-        demonstration = np.genfromtxt(f'src/cartpole_gazebo/demonstrations/demo{i}.csv', delimiter=',')
+        new_E.append(E[i])
+        demonstration = np.genfromtxt(f'src/cartpole_gazebo/dynamics/test{i}.csv', delimiter=',')
         demonstration[:, 0] = np.pi - np.abs(demonstration[:, 0])
         demonstration = np.hstack((demonstration[:, 2:], demonstration[:, :2]))
         D.append(demonstration)
@@ -24,9 +24,9 @@ def main():
     L = [[-15, 15], [-15, 15], [-np.pi, np.pi], [-11, 11]]
 
     print("Visualize Ergodic Metric")
-    plot_phix_metric = Plot2DMetric(K, L, dt, E, D, 0, 1)
+    plot_phix_metric = Plot2DMetric(D, E, K, L, dt, 0, 1, interpolation='bilinear')
     plot_phix_metric.visualize_ergodic()
-    plot_phix_metric.visualize_trajectory()
+    #plot_phix_metric.visualize_trajectory()
 
     print("Calculating Ergodic Helpers")
 
