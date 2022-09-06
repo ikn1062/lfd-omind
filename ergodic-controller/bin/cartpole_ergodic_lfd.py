@@ -1,5 +1,5 @@
 import numpy as np
-from src.ergodic_controller import ErgodicMeasure, controlleriLQR, Plot2DMetric
+from src.ergodic_controller import ErgodicMeasure, Plot2DMetric, iLQR
 
 
 def main():
@@ -19,14 +19,14 @@ def main():
         demonstration = np.hstack((demonstration[:, 2:], demonstration[:, :2]))
         D.append(demonstration)
 
-    K = 6
-    dt = 1
+    K = 4
+    dt = 0.01
     L = [[-15, 15], [-15, 15], [-np.pi, np.pi], [-11, 11]]
 
     print("Visualize Ergodic Metric")
     plot_phix_metric = Plot2DMetric(D, E, K, L, dt, 0, 1, interpolation='bilinear')
     plot_phix_metric.visualize_ergodic()
-    #plot_phix_metric.visualize_trajectory()
+    # plot_phix_metric.visualize_trajectory()
 
     print("Calculating Ergodic Helpers")
 
@@ -38,10 +38,9 @@ def main():
     print("Starting Grad Descent")
 
     x0 = [0, 0, 0, 0]
-    t0, tf = 0, 15
+    t0, tf = 0, 10
 
-    mpc_model_1 = controlleriLQR(x0, t0, tf, L, hk, phik, lambdak, A, B, dt=dt, K=K)
-    # mpc_model_1 = controllerLQR(x0, t0, tf, L, hk, phik, lambdak, A, B, dt=dt, K=K)
+    mpc_model_1 = iLQR(x0, t0, tf, L, hk, phik, lambdak, A, B, dt=dt, K=K)
     mpc_model_1.grad_descent()
 
 

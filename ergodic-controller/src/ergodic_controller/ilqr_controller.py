@@ -3,8 +3,8 @@ import matplotlib.pyplot as plt
 from time import sleep
 
 
-class controlleriLQR:
-    def __init__(self, x0, t0, tf, L, hk, phik, lambdak, A, B, dt=0.01, K=6, max_u=100, rospy_pub=None):
+class iLQR:
+    def __init__(self, x0, t0, tf, L, hk, phik, lambdak, A, B, u_init=1, dt=0.01, K=6, max_u=100, rospy_pub=None):
         """
         iLQR Controller Class which generates controls for ergodic system in loop
 
@@ -15,6 +15,7 @@ class controlleriLQR:
         :param hk: Normalizing factor for Fk - generated from ErgodicMeasure Class (dict)
         :param phik: Spatial Distribution of demonstrations - generated from ErgodicMeasure Class (dict)
         :param lambdak: Coefficient of Hilbert Space - generated from ErgodicMeasure Class (dict)
+        :param u_init: Initial Control for time period (np array)
         :param A: A matrix for dynamic system (np array)
         :param B: B matrix for dynamic system (np array)
         :param dt: Time difference (float)
@@ -26,19 +27,23 @@ class controlleriLQR:
         self.n = len(x0)
         self.t0, self.tf = t0, tf
         self.dt = dt
+        self.timespan = np.arange(t0, tf+dt, dt)
+
+        # Dynamics
+        self.A, self.B = A, B
 
         # Initialize x_t and u_t variables
-        self.u = np.array([[32], [32]])
+        self.u_init = u_init
         self.max_u = max_u
         self.x0 = np.transpose(x0)
-        self.x_t = np.transpose(x0)
+        self.u_t = self.u_init * np.ones((len(self.timespan), 1))
+        self.x_t = self.make_trajectory(x0, self.u_t)
 
         # Control Constants
         self.K = K
-        self.q = 1
-        self.R = np.array([[0.01]])
-        # self.Q = 10*np.eye(self.n, dtype=float)
-        self.Q = np.diag([0.1, 1.0, 100.0, 5.0])
+        self.q = 1000
+        self.R = np.array([[2]])
+        self.Q = np.diag([0.1, 0.1, 2.0, 2.0])
 
         self.P = np.zeros((self.n, self.n))
         self.r = np.array([[0.] * self.n]).T
@@ -47,24 +52,21 @@ class controlleriLQR:
 
         # Grad descent
         self.beta = 0.15
+        self.eps = 0.01
 
         # Control Variables
         self.at = np.zeros((np.shape(self.x_t)))
-        self.bt = np.zeros(np.shape(self.u))
-
-        # Dynamics constants
-        self.A, self.B = A, B
+        self.bt = np.zeros(np.shape(self.u_t))
 
         # Variable values as a function of k
         self.hk_values = hk
         self.phik_values = phik
         self.lambdak_values = lambdak
-        self.ck_values = {}
 
         # Set up Rospy Publisher
         self.rospy_pub = rospy_pub
 
-    def grad_descent(self):
+    def grad_descent(self, plot=True, plot_freq=20):
         """
         Uses iterative gradient descent to find optimal control at each time step
         - Compares spatial statistics of current trajectory to the spatial distributions of demonstrations
@@ -72,72 +74,55 @@ class controlleriLQR:
         - Creates plot of position state vector x over a period of time
         - Creates plot of control state vector u over a period of time
 
+        :param plot: Whether to plot state vector x and control u over entire time period (bool)
+        :param plot_freq: Plotting frequency for state and control vector plots (int)
         :return: None
         """
-        gamma = self.beta
-        t0, dt = self.t0, self.dt
-        self.x_t = self.make_trajectory(self.x0, self.u)
+        dj = np.inf
+        ii = 0
 
-        t = np.arange(self.t0, self.tf + 2 * self.dt, self.dt)
-        x_values = np.zeros((len(t), self.n))
-        u_values = np.zeros((len(t), 1))
+        while abs(dj) > self.eps:
+            if plot and not ii % plot_freq:
+                fig, axs = plt.subplots(2, 2)
+                axs[0, 0].plot(self.timespan, self.x_t[:, 0])
+                axs[0, 1].plot(self.timespan, self.x_t[:, 1])
+                axs[1, 0].plot(self.timespan, self.x_t[:, 2])
+                axs[1, 1].plot(self.timespan, self.x_t[:, 3])
+                plt.show()
 
-        x_values[0, :] = self.x_t[1, :]
-        u_values[0] = self.u[0]
+                plt.plot(self.timespan, self.u_t)
+                plt.show()
 
-        ii = 1
-        while t0 < self.tf:
-            print("New loop")
-            print(f"x_trajec:\n {self.x_t}")
             at, bt = self.calc_at(), self.calc_b()
             listP, listr = self.calc_P_r(at, bt)
             zeta = self.desc_dir(listP, listr, bt)
-            DJ = self.DJ(zeta, at, bt)
-            print(f"DJ:\n {DJ}")
+            dj = self.DJ(zeta, at, bt)
+            print(f"DJ: {dj}")
+
             v = zeta[1]
-            print(v)
-            u_new = self.u + gamma * v
-
-            if self.rospy_pub:
-                rospy.loginfo(u_new[1, 0])
-                self.rospy_pub.publish(u_new[1, 0])
-
-            print(f"u_new:\n {u_new}")
-            self.x_t = self.make_trajectory(self.x_t[1], u_new)
-
-            self.u = u_new[:]
-
-            x_values[ii, :] = self.x_t[1, :]
-            u_values[ii] = u_new[1]
-
-            t0 += self.dt
+            self.u_t = self.u_t + self.beta * v
+            self.x_t = self.make_trajectory(self.x0, self.u_t)
             ii += 1
 
-        fig, axs = plt.subplots(2, 2)
-        axs[0, 0].plot(t, x_values[:, 0])
-        axs[0, 1].plot(t, x_values[:, 1])
-        axs[1, 0].plot(t, x_values[:, 2])
-        axs[1, 1].plot(t, x_values[:, 3])
-        plt.show()
-
-        plt.plot(t, u_values)
-        plt.show()
-        return 0
-
-    def make_trajectory(self, x0, u):
+    def make_trajectory(self, x0, u_t):
         """
         Creates a trajectory of x from a given initial state, xt, and control input u
         - The output is a trajectory over the time horizon T of the input control
 
         :param x0: Initial position vector (np array of shape (1, n))
-        :param u: Control input (np array of shape (T, m)
+        :param u_t: Control input (np array of shape (T, m)
         :return: A trajectory of x over time horizon T of the input control (np array of shape (T, n))
         """
-        x_traj = np.zeros((len(u), len(x0)))
+        N = len(self.timespan)
+        x_traj = np.zeros((N, len(x0)))
         x_traj[0, :] = np.transpose(x0[:])
-        for i in range(1, len(u)):
-            xt_1 = self.integrate(x_traj[i - 1, :], u[i - 1])
-            x_traj[i, :] = np.transpose(xt_1)
+        for i in range(1, N):
+            xi_new = self.__integrate(x_traj[i - 1, :], u_t[i - 1])
+            while xi_new[2] > np.pi:
+                xi_new[2] -= 2 * np.pi
+            while xi_new[2] < -np.pi:
+                xi_new[2] += 2 * np.pi
+            x_traj[i, :] = np.transpose(xi_new)
         return x_traj
 
     def desc_dir(self, listP, listr, bt):
@@ -159,13 +144,13 @@ class controlleriLQR:
         """
         A, B = self.A, self.B
         z = np.zeros((np.shape(self.x_t)))
-        v = np.zeros((np.shape(bt)))
+        v = np.zeros((np.shape(self.u_t)))
         Rinv = np.linalg.inv(self.R)
-        for i in range(len(bt)):
+        for i in range(1, len(self.timespan)):
             P, r, b = listP[i], listr[i], bt[i]
-            v[i] = -Rinv @ np.transpose(B) @ P @ z[i] - Rinv @ np.transpose(B) @ r - Rinv * b
-            zdot = A @ z[i] + B @ v[i]
-            z[i] += zdot * self.dt
+            v[i] = -Rinv @ np.transpose(B) @ P @ z[i-1] - Rinv @ np.transpose(B) @ r - Rinv * b
+            zdot = A @ z[i-1] + B @ v[i]
+            z[i] = z[i-1] + zdot * self.dt
         zeta = (z, v)
         return zeta
 
@@ -178,9 +163,9 @@ class controlleriLQR:
         :param bt: b vector over time horizon T (np array of shape (T, m)) - calculated from self.calc_b
         :return: DJ value (float)
         """
-        J = np.zeros((len(zeta)))
+        J = np.zeros((len(self.timespan)))
         z, v = zeta[0], zeta[1]
-        for i in range(len(zeta[0])):
+        for i in range(len(self.timespan)):
             a_T = np.transpose(at[i])
             b_T = np.transpose(bt[i])
             J_val = a_T @ z[i] + b_T @ v[i]
@@ -190,29 +175,30 @@ class controlleriLQR:
 
     def calc_P_r(self, at, bt):
         """
-        Calculates P and r
+        Calculates P and r used to solve the Ricatti Equations
 
-        :param at:
-        :param bt:
-        :return:
+        :param at: a vector over time horizon T (np array of shape (T, n)) - calculated from self.calc_at
+        :param bt: b vector over time horizon T (np array of shape (T, m)) - calculated from self.calc_b
+        :return: list of P matrix and r matrix over the time horizon (tuple)
         """
-        P, A, B, Q = self.P, self.A, self.B, self.Q
-        dim_len = len(at)
-        listP, listr = np.zeros((dim_len, self.n, self.n)), np.zeros((dim_len, self.n, 1))
-        listP[0] = self.P[:]
-        listr[0] = self.r[:]
+        A, B, Q = self.A, self.B, self.Q
+        listP, listr = np.zeros((len(self.timespan), self.n, self.n)), np.zeros((len(self.timespan), self.n, 1))
+        listP[0], listr[0] = self.P[:], self.r[:]
         Rinv = np.linalg.inv(self.R)
-        for i in range(dim_len - 1):
-            # difference in Todds lecture notes for Pdot
-            P_dot = P @ (B @ Rinv @ np.transpose(B)) @ P - Q - P @ A + np.transpose(A) @ P
-            a, b = np.transpose([at[i]]), bt[i]
-            r_dot = - np.transpose(A - B @ Rinv @ np.transpose(B) @ P) @ listr[i] - a + (P @ B @ Rinv) * b
-            listP[i + 1] = self.dt * P_dot + listP[i]
-            listr[i + 1] = self.dt * r_dot + listr[i]
+
+        for i in range(1, len(self.timespan)):
+            P, r = listP[i-1], listr[i-1]
+            a, b = np.transpose([at[i]]), [bt[i]]
+
+            P_dot = P @ B @ Rinv @ np.transpose(B) @ P - Q - P @ A - np.transpose(A) @ P
+            r_dot = - np.transpose(A - B @ Rinv @ np.transpose(B) @ P) @ r - a + P @ B @ Rinv @ b
+
+            listP[i] = self.dt * P_dot + listP[i - 1]
+            listr[i] = self.dt * r_dot + listr[i - 1]
 
         return listP, listr
 
-    def cart_pole_dyn(self, X, U):
+    def dynamics(self, X, U):
         """
         Calculate Xdot (Change in X from timestep i-1 to i)
 
@@ -224,10 +210,13 @@ class controlleriLQR:
         :return: Array of velocity vector Xdot over time horizon T (np array of shape (T, n))
         """
         A, B = self.A, self.B
-        Xdot = A @ X + B * U
+        Xdot = A @ X + B @ U
+        # print(f"X: {X}")
+        # print(f"AX: {A @ X },\n BU: {B@U}")
+        # print(f"Xdot: {Xdot}")
         return Xdot
 
-    def integrate(self, xi, ui):
+    def __integrate(self, xi, ui):
         """
         Finds the next state vector x using the Runge Kutta integral method
 
@@ -235,14 +224,11 @@ class controlleriLQR:
         :param ui: State control vector u (np array with shape (1, m))
         :return: State position vector x at next time step (np array with shape (1, n))
         """
-        if np.shape(xi) != (4, 1):
-            xi = np.transpose([xi])
-        f = self.cart_pole_dyn
-        k1 = self.dt * f(xi, ui)
-        k2 = self.dt * f(xi + k1 / 2, ui)
-        k3 = self.dt * f(xi + k2 / 2, ui)
-        k4 = self.dt * f(xi + k3, ui)
-        x_i_next = xi + (1 / 6 * (k1 + 2 * k2 + 2 * k3 + k4))
+        k1 = self.dt * self.dynamics(xi, ui)
+        k2 = self.dt * self.dynamics(xi + k1 / 2, ui)
+        k3 = self.dt * self.dynamics(xi + k2 / 2, ui)
+        k4 = self.dt * self.dynamics(xi + k3, ui)
+        x_i_next = xi + (1/6 * (k1 + 2 * k2 + 2 * k3 + k4))
         return x_i_next
 
     def __calc_Fk(self, xt, k):
@@ -259,8 +245,8 @@ class controlleriLQR:
         :return: Fk Value (float)
         """
         fourier_basis = 1
-        for i in range(len(xt)):
-            fourier_basis *= np.cos((k[i] * np.pi * xt[i]) / self.L[i][1])
+        for i in range(self.n):
+            fourier_basis *= np.cos((k[i] * np.pi * xt[i]) / (self.L[i][1] - self.L[i][0]))
         hk = self.hk_values[self.__k_str(k)]
         Fk = (1 / hk) * fourier_basis
         return Fk
@@ -282,8 +268,8 @@ class controlleriLQR:
         dfk = np.zeros(np.shape(x_t))
         for t, x in enumerate(x_t):
             for i in range(len(x)):
-                ki = (k[i] * np.pi) / self.L[i][1]
-                dfk_xi = (1 / hk) * -ki * np.cos(ki * x[i]) * np.sin(ki * x[i])
+                ki = (k[i] * np.pi) / (self.L[i][1] - self.L[i][0])
+                dfk_xi = (1 / hk) * - ki * np.cos(ki * x[i]) * np.sin(ki * x[i])
                 dfk[t, i] = dfk_xi
         return dfk
 
@@ -299,12 +285,10 @@ class controlleriLQR:
         :return: ck value (float)
         """
         x_t = self.x_t
-        T = len(x_t) * self.dt
-        Fk_x = np.zeros(len(x_t))
-        for i in range(len(x_t)):
+        Fk_x = np.zeros(len(self.timespan))
+        for i in range(len(self.timespan)):
             Fk_x[i] = self.__calc_Fk(x_t[i], k)
-        ck = (1 / T) * np.trapz(Fk_x, dx=self.dt)
-        self.ck_values = ck
+        ck = (1 / self.tf) * np.trapz(Fk_x, dx=self.dt)
         return ck
 
     def calc_at(self):
@@ -331,11 +315,9 @@ class controlleriLQR:
         :return: at coefficients for a given k (np array of shape (T, n)) - same shape as x
         """
         k_str = self.__k_str(k)
-        lambdak = self.lambdak_values[k_str]
+        lambdak, phik = self.lambdak_values[k_str], self.phik_values[k_str]
         ck = self.calc_ck(k)
-        phik = self.phik_values[k_str]
-        # DFk should be of size (xt), maybe change to matrix addition
-        self.at = ((lambdak * 2 * (ck - phik) * (1 / self.tf)) * self.calc_DFk(k)) + self.at
+        self.at = (lambdak * 2 * (ck - phik) * (1 / self.tf) * self.calc_DFk(k)) + self.at
 
     def calc_b(self):
         """
@@ -347,10 +329,9 @@ class controlleriLQR:
         :param k: The series coefficient given as a list of length dimensions (list)
         :return: at coefficients for a given k (np array of shape (T, n)) - same shape as x
         """
-        bt = np.zeros((len(self.u), 1))
-        print(bt)
-        for i, u in enumerate(self.u):
-            bt[i] = self.u[i] * self.R
+        bt = np.zeros(np.shape(self.u_t))
+        for i, u in enumerate(self.u_t):
+            bt[i] = np.transpose(self.u_t[i]) @ self.R
         return bt
 
     def __recursive_wrapper(self, K, k_arr, n, f):
@@ -377,3 +358,4 @@ class controlleriLQR:
         :return: Series coefficient as a string (str)
         """
         return ''.join(str(i) for i in k)
+
