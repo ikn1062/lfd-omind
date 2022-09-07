@@ -1,4 +1,5 @@
 import numpy as np
+import matplotlib.pyplot as plt
 from scipy.linalg import solve_continuous_are as lqr
 
 
@@ -6,6 +7,9 @@ class LQR:
     def __init__(self, x0, t0, tf, dt, A, B):
         self.x0 = x0
         self.t0, self.tf, self.dt = t0, tf, dt
+        self.timespan = np.arange(t0, tf+dt, dt)
+
+        self.n = len(x0)
 
         self.A = A
         self.B = B
@@ -15,14 +19,34 @@ class LQR:
         P = lqr(A, B, Q, R)
         self.K = np.dot(np.linalg.inv(R), np.dot(B.T, P))
 
-    def controller(self):
+    def controller(self, show_plot=False):
         t0, tf, dt = self.t0, self.tf, self.dt
         x = self.x0
 
+        x_trajec = np.zeros((len(self.timespan), self.n))
+        u_control = np.zeros((len(self.timespan), np.shape(self.B)[1]))
+        ii = 0
+
         while t0 < tf:
             u = -np.dot(self.K, x)
+
+            x_trajec[ii, :] = x
+            u_control[ii, :] = u
+
             x = self.__integrate(x, u)
             t0 += dt
+            ii += 1
+
+        if show_plot:
+            fig, axs = plt.subplots(2, 2)
+            axs[0, 0].plot(self.timespan, x_trajec[:, 0])
+            axs[0, 1].plot(self.timespan, x_trajec[:, 1])
+            axs[1, 0].plot(self.timespan, x_trajec[:, 2])
+            axs[1, 1].plot(self.timespan, x_trajec[:, 3])
+            plt.show()
+
+            plt.plot(self.timespan, u_control)
+            plt.show()
 
     def dynamics(self, X, U):
         """
