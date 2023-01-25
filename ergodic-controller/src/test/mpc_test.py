@@ -1,5 +1,5 @@
 import numpy as np
-from src.ergodic_controller import ErgodicMeasure, MPC
+from src.ergodic_controller import ErgodicMeasure, iLQR
 
 
 def test_mpc_init(mpc):
@@ -24,7 +24,7 @@ def test_dynamics_1(mpc):
     A, B = mpc.A, mpc.B
     A_check = np.array([[0, 1, 0, 0], [0, 0, 8.408, 0], [0, 0, 0, 1], [0, 0, 0.8408, 0]])
     B_check = np.array([[0], [0.05], [0], [-0.0428]])
-    A_eps = 0.01*np.ones((np.shape(A)))
+    A_eps = 0.01 * np.ones((np.shape(A)))
     B_eps = 0.01 * np.ones((np.shape(B)))
     assert (abs(A - A_check) < A_eps).all, f"Matrix A is wrong, got: {A}"
     assert (abs(B - B_check) < B_eps).all, f"Matrix B is wrong, got: {B}"
@@ -37,13 +37,13 @@ def test_dynamics_2(mpc):
     u = 32
     A = np.array([[0, 1, 0, 0], [0, 0, 8.408, 0], [0, 0, 0, 1], [0, 0, 0.8408, 0]])
     B = np.array([[0], [0.05], [0], [-0.0428]])
-    x_dot = A@x + B*u
+    x_dot = A @ x + B * u
     mpc_x_dot = mpc.cart_pole_dyn(x, u)
     x_dot_eps = 0.01 * np.ones((np.shape(x)))
     assert (abs(x_dot - mpc_x_dot) < x_dot_eps).all, f"Matrix B is wrong, got: {mpc_x_dot}"
 
     dt = 0.01
-    x_new = x + x_dot*dt
+    x_new = x + x_dot * dt
     mpc_x_new = mpc.integrate(x, u)
     assert (abs(x_new - mpc_x_new) < x_dot_eps).all, f"Matrix B is wrong, got: {mpc_x_new}"
     print("test_dynamics_2 pass")
@@ -127,13 +127,13 @@ if __name__ == "__main__":
     print("Get MPC model - no ergodic variables")
     x0 = [0, 0, -np.pi, 0]
     t0, tf = 0, 30
-    mpc_model = MPC(x0, t0, tf, L, hk, phik, lambdak)
+    mpc_model = iLQR(x0, t0, tf, L, hk, phik, lambdak)
 
     print("Start MPC test")
-    #test_mpc_init(mpc_model)
-    #test_dynamics_1(mpc_model)
-    #test_dynamics_2(mpc_model)
-    #test_make_trajec(mpc_model)
+    # test_mpc_init(mpc_model)
+    # test_dynamics_1(mpc_model)
+    # test_dynamics_2(mpc_model)
+    # test_make_trajec(mpc_model)
 
     D = []
     for i in range(1, 7):
@@ -142,12 +142,11 @@ if __name__ == "__main__":
     ergodic_test = ErgodicMeasure(D, E, K, L, dt)
     print("Getting Ergodic Helpers")
     hk, lambdak, phik = ergodic_test.calc_fourier_metrics()
-    mpc_model_1 = MPC(x0, t0, tf, L, hk, phik, lambdak, dt=dt, K=K)
+    mpc_model_1 = iLQR(x0, t0, tf, L, hk, phik, lambdak, dt=dt, K=K)
 
-    #test_ck_DFk(mpc_model_1)
-    #test_at_bt(mpc_model_1)
-    #test_desc_dir(mpc_model_1)
+    # test_ck_DFk(mpc_model_1)
+    # test_at_bt(mpc_model_1)
+    # test_desc_dir(mpc_model_1)
 
-    mpc_model_2 = MPC(x0, t0, tf, L, hk, phik, lambdak, dt=dt, K=K)
+    mpc_model_2 = iLQR(x0, t0, tf, L, hk, phik, lambdak, dt=dt, K=K)
     test_grad_descent(mpc_model_2)
-

@@ -11,7 +11,6 @@ import threading
 import termios
 import tty
 
-force = 0
 moveBindings = {'a': -1, 'd': 1, 'A': -1, 'D': 1}
 magBindings = {'w': 2.0, 's': 0.5, 'W': 2.0, 'S': 0.5}
 
@@ -27,6 +26,7 @@ class PublishThread(threading.Thread):
         super(PublishThread, self).__init__()
 
         self.publisher = rospy.Publisher("/cart_pole_controller/command", Float64, queue_size=1)
+        self.force = 0
         self.f = 0.0
         self.mag = 0.0
 
@@ -73,28 +73,27 @@ class PublishThread(threading.Thread):
 
         :return: None
         """
-        global force
-
         while not self.done:
             self.condition.acquire()
             self.condition.wait(self.timeout)
 
-            if self.f == 0.0 or self.f < 0 and force > 0 or self.f > 0 and force < 0:
-                force = 0
+            # add brackets here
+            if self.f == 0.0 or self.f < 0 and self.force > 0 or self.f > 0 and self.force < 0:
+                self.force = 0
             else:
-                force += self.f * self.mag
+                self.force += self.f * self.mag
 
-            if force > 240:
-                force = 240.0
-            elif force < -240:
-                force = -240.0
+            if self.force > 240:
+                self.force = 240.0
+            elif self.force < -240:
+                self.force = -240.0
 
-            self.condition.release()
             # print(force)
-            self.publisher.publish(force)
+            self.publisher.publish(self.force)
+            self.condition.release()
 
         # Publish stop message when thread exits.
-        force = 0
+        self.force = 0
         self.publisher.publish(self.f)
 
 
@@ -162,7 +161,7 @@ if __name__ == "__main__":
     try:
         pub_thread.update(f, mag)
         rospy.loginfo(vels(mag))
-        while (1):
+        while True:
             # Gets key from terminal
             key = getKey(settings, key_timeout)
 
@@ -176,7 +175,7 @@ if __name__ == "__main__":
                 if key == '' and f == 0:
                     continue
                 f = 0
-                if (key == '\x03'):
+                if key == '\x03':
                     break
 
             # Publishes to rospy

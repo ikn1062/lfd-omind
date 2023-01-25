@@ -43,6 +43,61 @@ class ErgodicMeasure:
         self.__recursive_wrapper(self.K + 1, [], self.n, self.calc_lambda_k)
         return self.hk_values, self.phik_values, self.lambdak_values
 
+    def calc_phik(self, k):
+        """
+        Calculates coefficients that describe the task definition, phi_k
+        - Spatial distribution of demonstrations
+
+        phi_k is defined by the following:
+        phi_k = sum w_j * c_k_j where j ranges from 1 to num_trajectories
+        - w_j is initialized as 1/num_trajectories, the weighting of each trajectory in the spatial coefficient
+
+        - Sets self.phi_k value in dictionary using k as a string
+        :param k: k: The series coefficient given as a list of length dimensions (list)
+        :return: None
+        """
+        phik = 0
+        for i in range(self.m):
+            phik += self.E[i] * self.w[i] * self.__calc_ck(self.D[i], k)
+        k_str = ''.join(str(i) for i in k)
+        self.phik_values[k_str] = phik
+
+    def calc_lambda_k(self, k):
+        """
+        Calculate lambda_k places larger weights on lower coefficients of information
+
+        lambda_k is defined by the following:
+        lambda_k = (1 + ||k||2) − s where s = n+1/2
+
+        - Sets self.lambda_k value in dictionary using k as a string
+        :param k: The series coefficient given as a list of length dimensions (list)
+        :return: None
+        """
+        s = (self.n + 1) / 2
+        lamnbda_k = 1 / ((1 + np.linalg.norm(k) ** 2) ** s)
+        k_str = ''.join(str(i) for i in k)
+        self.lambdak_values[k_str] = lamnbda_k
+
+    def __calc_ck(self, x_t, k):
+        """
+        Calculates spacial statistics for a given trajectory and series coefficient value
+
+        ck is given by:
+        ck = integral Fk(x(t)) dt from t=0 to t=T
+        - where x(t) is a trajectory, mapping t to position vector x
+
+        :param x_t: x(t) function, mapping position vectors over a period of time (np array)
+        :param k: k: The series coefficient given as a list of length dimensions (list)
+        :return: ck value (float)
+        """
+        x_len = len(x_t)
+        T = x_len * self.dt
+        Fk_x = np.zeros(x_len)
+        for i in range(x_len):
+            Fk_x[i] = self.calc_Fk(x_t[i], k)
+        ck = (1 / T) * np.trapz(Fk_x, dx=self.dt)
+        return ck
+
     def calc_Fk(self, x, k):
         """
         Calculates normalized fourier coeffecient using basis function metric
@@ -76,7 +131,7 @@ class ErgodicMeasure:
         hk = 1
         for i in range(self.n):
             l0, l1 = self.L[i][0], self.L[i][1]
-            if not k[i]:
+            if not k[i]:  # if k[i] is 0, we continue to avoid a divide by 0 error
                 hk *= (l1 - l0)
                 continue
             k_i = (k[i] * np.pi) / l1
@@ -85,62 +140,6 @@ class ErgodicMeasure:
         hk = np.sqrt(hk)
         self.hk_values[k_str] = hk
         return hk
-
-    def __calc_ck(self, x_t, k):
-        """
-        Calculates spacial statistics for a given trajectory and series coefficient value
-
-        ck is given by:
-        ck = integral Fk(x(t)) dt from t=0 to t=T
-        - where x(t) is a trajectory, mapping t to position vector x
-
-        :param x_t: x(t) function, mapping position vectors over a period of time (np array)
-        :param k: k: The series coefficient given as a list of length dimensions (list)
-        :return: ck value (float)
-        """
-        x_len = len(x_t)
-        T = x_len * self.dt
-        Fk_x = np.zeros(x_len)
-        for i in range(x_len):
-            Fk_x[i] = self.calc_Fk(x_t[i], k)
-        ck = (1 / T) * np.trapz(Fk_x, dx=self.dt)
-        return ck
-
-    def calc_phik(self, k):
-        """
-        Calculates coefficients that describe the task definition, phi_k
-        - Spatial distribution of demonstrations
-
-        phi_k is defined by the following:
-        phi_k = sum w_j * c_k_j where j ranges from 1 to num_trajectories
-        - w_j is initialized as 1/num_trajectories, the weighting of each trajectory in the spatial coefficient
-
-        - Sets self.phi_k value in dictionary using k as a string
-        :param k: k: The series coefficient given as a list of length dimensions (list)
-        :return: None
-        """
-        phik = 0
-        for i in range(self.m):
-            phik += self.E[i] * self.w[i] * self.__calc_ck(self.D[i], k)
-        k_str = ''.join(str(i) for i in k)
-        self.phik_values[k_str] = phik
-        # return phik
-
-    def calc_lambda_k(self, k):
-        """
-        Calculate lambda_k places larger weights on lower coefficients of information
-
-        lambda_k is defined by the following:
-        lambda_k = (1 + ||k||2) − s where s = n+1/2
-
-        - Sets self.lambda_k value in dictionary using k as a string
-        :param k: The series coefficient given as a list of length dimensions (list)
-        :return: None
-        """
-        s = (self.n + 1) / 2
-        lamnbda_k = 1 / ((1 + np.linalg.norm(k) ** 2) ** s)
-        k_str = ''.join(str(i) for i in k)
-        self.lambdak_values[k_str] = lamnbda_k
 
     def __recursive_wrapper(self, K, k_arr, count, f):
         """
@@ -156,4 +155,18 @@ class ErgodicMeasure:
             for k in range(K):
                 self.__recursive_wrapper(K, k_arr + [k], count - 1, f)
         else:
+            print(k_arr)
             f(k_arr)
+
+    def get_phik(self, calc=False):
+        if calc:
+            self.__recursive_wrapper(self.K + 1, [], self.n, self.calc_phik)
+        return self.phik_values
+
+    def get_hk(self):
+        return self.hk_values
+
+    def get_lambdak_values(self, calc=False):
+        if calc:
+            self.__recursive_wrapper(self.K + 1, [], self.n, self.calc_lambda_k)
+        return self.lambdak_values

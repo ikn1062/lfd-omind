@@ -1,94 +1,64 @@
+import os
 import numpy as np
-from src.ergodic_controller import ErgodicMeasure, Plot2DMetric, iLQR, LQR
+import json
+
+from src.ergodic_controller import ErgodicMeasure, Plot2DMetric, iLQR
 
 
 def main():
     print("Getting Demonstrations")
-    num_trajectories = 14
 
-    demonstration_list = [0]
+    # read values from json
+    with open(os.path.join("..", "ergodic_system_properties.json"), 'r') as f:
+        properties = json.load(f)
+        ergodic_properties = properties["ergodic_system"]
+        dynamic_properties = properties["dynamic_system"]
 
-    D = []
-    E, new_E = [1, -1, -1, -1, -1, -1, 1, 1, 1, -1, -1, -1, 1, -1], []
-    for i in range(num_trajectories):
-        if i not in demonstration_list:
+    file_path = os.path.join("..", properties["demonstration_path"])
+    K, L, dt, E = ergodic_properties["K"], ergodic_properties["L"], ergodic_properties["dt"], ergodic_properties["E"]
+    x0, t0, tf = dynamic_properties["x0"], dynamic_properties["t0"], dynamic_properties["tf"]
+    A, B = dynamic_properties["A"], dynamic_properties["B"]
+
+    demonstration_list, D, new_E = [], [], []
+
+    input_demonstration = input("Please input the demonstrations you would like to use for training [list] (if empty, all demonstrations are used) \ninput: ")
+    if input_demonstration != "q" or len(input_demonstration) != 0:
+        input_demonstration = input_demonstration.split(",")
+        for num in input_demonstration:
+            if num.isnumeric():
+                demonstration_list.append(int(num))
+
+    sorted_files = sorted(os.listdir(file_path), key=lambda x: int(x[4:-4]))
+    for i, file in enumerate(sorted_files):
+        if (len(demonstration_list) != 0 and i not in demonstration_list) or "csv" not in file:
             continue
         new_E.append(E[i])
-        demonstration = np.genfromtxt(f'src/cartpole_gazebo/dynamics/test{i}.csv', delimiter=',')
-        # demonstration[:, 0] = np.pi - np.abs(demonstration[:, 0])
+        demonstration_path = os.path.join(file_path, file)
+        demonstration = np.genfromtxt(demonstration_path, delimiter=',')
         demonstration = np.hstack((demonstration[:, 2:], demonstration[:, :2]))
         D.append(demonstration)
-
-    K = 4
-    dt = 0.01
-    L = [[-15, 15], [-15, 15], [-np.pi, np.pi], [-11, 11]]
-
-    print("Visualize Ergodic Metric")
-    plot_phix_metric = Plot2DMetric(D, E, K, L, dt, 0, 1, interpolation='bilinear')
-    # plot_phix_metric.visualize_ergodic()
-    # plot_phix_metric.visualize_trajectory()
+    print(new_E)
+    if len(D) == 0:
+        raise FileNotFoundError("No files found in demonstration folder")
 
     print("Calculating Ergodic Helpers")
-
-    ergodic_test = ErgodicMeasure(D, E, K, L, dt)
+    ergodic_test = ErgodicMeasure(D, new_E, K, L, dt)
     hk, lambdak, phik = ergodic_test.calc_fourier_metrics()
 
-    M, m, l = 20, 20, 0.75
-    A, B = cartpole_AB_matrix(M, m, l)
+    print("Visualize Ergodic Metric")
+    plot_phix_metric = Plot2DMetric(D, new_E, K, L, dt, 0, 1, interpolation='bilinear')
+
+    vis_ergodic = input("Would you like to visualize the Ergodic Metric Spatial Distribution [yY/nN]: ")
+    if vis_ergodic in {"y", "Y"}:
+        plot_phix_metric.visualize_ergodic()
+    vis_trajec = input("Would you like to visualize the Distribution Trajectories [yY/nN]: ")
+    if vis_trajec in {"y", "Y"}:
+        plot_phix_metric.visualize_trajectory()
+
+    input("Enter to start controller: ")
     print("Starting Grad Descent")
-
-    # x0 = [0, 0, 0, 0]
-    x0 = [0, 0, np.pi, 0]
-    t0, tf = 0, 10
-
     mpc_model_1 = iLQR(x0, t0, tf, L, hk, phik, lambdak, A, B, dt=dt, K=K)
     mpc_model_1.grad_descent()
-
-
-def cartpole_AB_matrix(M, m, l):
-    g = 9.81  # gravitational constant
-    I = (m * (l ** 2)) / 12
-
-    """
-    denominator = 1 / (13*M + m)
-    a = denominator * -12 * m * g
-    b = (denominator * 12 * g * (M + m)) / l
-    c = denominator * 13
-    d = denominator * (-12 / l)
-    
-    denominator = 1 / (I * (M + m) + M * m * (l ** 2))
-    a = denominator * (g * (m ** 2) * (l ** 2))
-    b = denominator * (-g * (M + m))
-    c = denominator * (I + m * (l ** 2))
-    d = denominator * (-m * l)
-
-    A = np.array([[0, 1, 0, 0],
-                  [0, 0, a, 0],
-                  [0, 0, 0, 1],
-                  [0, 0, b, 0]])
-    B = np.array([[0],
-                  [c],
-                  [0],
-                  [d]])
-    """
-    A = [[0, 1, 0, 0],
-         [0, -3 / M, 1 * m * g / M, 0],
-         [0, 0, 0, 1],
-         [0, -1 * 3 / M / l, -1 * (m + M) * g / M / l, 0]]
-    B = np.transpose(np.array([[0, 1/M, 0, 1 / M / l]]))
-
-    """
-    a = g / (l * (4.0 / 3 - m / (m + M)))
-    A = np.array([[0, 1, 0, 0],
-                  [0, 0, a, 0],
-                  [0, 0, 0, 1],
-                  [0, 0, a, 0]])
-
-    # input matrix
-    b = -1 / (l * (4.0 / 3 - m / (m + M)))
-    B = np.array([[0], [1 / (m + M)], [0], [b]])
-    """
-    return A, B
 
 
 if __name__ == "__main__":

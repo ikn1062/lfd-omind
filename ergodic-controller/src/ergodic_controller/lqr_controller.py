@@ -5,6 +5,18 @@ from scipy.linalg import solve_continuous_are as lqr
 
 class LQR:
     def __init__(self, x0, t0, tf, dt, A, B):
+        """
+        Class method for LQR controller for any given system described by an A and B matrix
+
+        Dynamics are in the form: X_dot = A @ X + B @ U
+
+        :param x0: Initial position vector state (np array)
+        :param t0: Initial time (float)
+        :param tf: Final time (float)
+        :param dt: Difference in time between each iteration (float)
+        :param A: A matrix describing dynamics of system (np array)
+        :param B: B matrix describing dynamics of system (np array)
+        """
         self.x0 = x0
         self.t0, self.tf, self.dt = t0, tf, dt
         self.timespan = np.arange(t0, tf+dt, dt)
@@ -20,6 +32,11 @@ class LQR:
         self.K = np.dot(np.linalg.inv(R), np.dot(B.T, P))
 
     def controller(self, show_plot=False):
+        """
+        Creates an LQR controller with the constants A, B, Q, and R
+        :param show_plot: Whether to show plots (bool)
+        :return: None
+        """
         t0, tf, dt = self.t0, self.tf, self.dt
         x = self.x0
 

@@ -26,10 +26,10 @@ class Plot2DMetric:
         self.dim1, self.dim2 = self.L[dim1], self.L[dim2]
 
         self.E = E
-        D = np.array(D)
+        D = np.array(D, dtype=object)
         self.D = [np.array(d)[:, [dim1, dim2]] for d in D]
         self.ergodic_measure = ErgodicMeasure(self.D, E, K, L, dt)
-        _, self.phik_dict, _ = self.ergodic_measure.calc_fourier_metrics()
+        self.phik_dict = self.ergodic_measure.get_phik(calc=True)
 
         self.Z = np.array([])
 
@@ -112,7 +112,7 @@ class Plot2DMetric:
         x_axis = np.linspace(self.dim1[0], self.dim1[1], axis_res)
         y_axis = np.linspace(self.dim2[0], self.dim2[1], axis_res)
         z = np.array([self.__calc_phix_x([i, j]) for j in y_axis for i in x_axis])
-        Z = z.reshape(50, 50)
+        Z = z.reshape(axis_res, axis_res)
         return Z
 
     def __calculate_contour_count(self):

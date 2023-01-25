@@ -4,7 +4,7 @@ from time import sleep
 
 
 class iLQR:
-    def __init__(self, x0, t0, tf, L, hk, phik, lambdak, A, B, u_init=1, dt=0.01, K=6, max_u=100, rospy_pub=None):
+    def __init__(self, x0, t0, tf, L, hk, phik, lambdak, A, B, u_init=1, dt=0.01, K=6, max_u=100):
         """
         iLQR Controller Class which generates controls for ergodic system in loop
 
@@ -63,10 +63,10 @@ class iLQR:
         self.phik_values = phik
         self.lambdak_values = lambdak
 
-        # Set up Rospy Publisher
-        self.rospy_pub = rospy_pub
+        # Lambda Helper function
+        self.k_to_str = lambda k: ''.join(str(i) for i in k)
 
-    def grad_descent(self, plot=True, plot_freq=20):
+    def grad_descent(self, plot=True, plot_freq=15):
         """
         Uses iterative gradient descent to find optimal control at each time step
         - Compares spatial statistics of current trajectory to the spatial distributions of demonstrations
@@ -83,45 +83,62 @@ class iLQR:
 
         while abs(dj) > self.eps:
             if plot and not ii % plot_freq:
-                fig, axs = plt.subplots(2, 2)
-                axs[0, 0].plot(self.timespan, self.x_t[:, 0])
-                axs[0, 1].plot(self.timespan, self.x_t[:, 1])
-                axs[1, 0].plot(self.timespan, self.x_t[:, 2])
-                axs[1, 1].plot(self.timespan, self.x_t[:, 3])
+                fig, axs = plt.subplots(4, 1)
+                axs[0].plot(self.timespan, self.x_t[:, 0])
+                axs[0].set_ylabel('x (m)')
+                axs[1].plot(self.timespan, self.x_t[:, 1])
+                axs[1].set_ylabel('x dot (m/s)')
+                axs[2].plot(self.timespan, self.x_t[:, 2])
+                axs[2].set_ylabel('Theta (rad)')
+                axs[3].plot(self.timespan, self.x_t[:, 3])
+                axs[3].set_ylabel('Theta dot (rad/s)')
+                axs[3].set_xlabel('Time (s)')
+                axs[0].set_title("State system over Time Horizon")
+                plt.tight_layout()
+
                 plt.show()
 
                 plt.plot(self.timespan, self.u_t)
+                plt.xlabel("Time (s)")
+                plt.ylabel("Control Force (N)")
+                plt.title("Control Applied over Time Horizon")
                 plt.show()
-
-            at, bt = self.calc_at(), self.calc_b()
-            listP, listr = self.calc_P_r(at, bt)
-            zeta = self.desc_dir(listP, listr, bt)
-            dj = self.DJ(zeta, at, bt)
-            print(f"DJ: {dj}")
+            try:
+                at, bt = self.calc_at(), self.calc_b()
+                listP, listr = self.calc_P_r(at, bt)
+                zeta = self.desc_dir(listP, listr, bt)
+                dj = self.DJ(zeta, at, bt)
+                print(f"DJ: {dj}")
+            except Exception as e:
+                print(f"Exception Occurred: {e}")
+                break
 
             v = zeta[1]
             self.u_t = self.u_t + self.beta * v
             self.x_t = self.make_trajectory(self.x0, self.u_t)
             ii += 1
 
-    def make_trajectory(self, x0, u_t):
+    def make_trajectory(self, x0, u_t, circular=True):
         """
         Creates a trajectory of x from a given initial state, xt, and control input u
         - The output is a trajectory over the time horizon T of the input control
 
         :param x0: Initial position vector (np array of shape (1, n))
         :param u_t: Control input (np array of shape (T, m)
+        :param circular: Property to define circular nature of a given
         :return: A trajectory of x over time horizon T of the input control (np array of shape (T, n))
+
         """
         N = len(self.timespan)
         x_traj = np.zeros((N, len(x0)))
         x_traj[0, :] = np.transpose(x0[:])
         for i in range(1, N):
             xi_new = self.__integrate(x_traj[i - 1, :], u_t[i - 1])
-            while xi_new[2] > np.pi:
-                xi_new[2] -= 2 * np.pi
-            while xi_new[2] < -np.pi:
-                xi_new[2] += 2 * np.pi
+            if circular:
+                while xi_new[2] > np.pi:
+                    xi_new[2] -= 2 * np.pi
+                while xi_new[2] < -np.pi:
+                    xi_new[2] += 2 * np.pi
             x_traj[i, :] = np.transpose(xi_new)
         return x_traj
 
@@ -211,9 +228,6 @@ class iLQR:
         """
         A, B = self.A, self.B
         Xdot = A @ X + B @ U
-        # print(f"X: {X}")
-        # print(f"AX: {A @ X },\n BU: {B@U}")
-        # print(f"Xdot: {Xdot}")
         return Xdot
 
     def __integrate(self, xi, ui):
@@ -247,7 +261,7 @@ class iLQR:
         fourier_basis = 1
         for i in range(self.n):
             fourier_basis *= np.cos((k[i] * np.pi * xt[i]) / (self.L[i][1] - self.L[i][0]))
-        hk = self.hk_values[self.__k_str(k)]
+        hk = self.hk_values[self.k_to_str(k)]
         Fk = (1 / hk) * fourier_basis
         return Fk
 
@@ -264,7 +278,7 @@ class iLQR:
         :return: DFk value (np array of size (1, n))
         """
         x_t = self.x_t
-        hk = self.hk_values[self.__k_str(k)]
+        hk = self.hk_values[self.k_to_str(k)]
         dfk = np.zeros(np.shape(x_t))
         for t, x in enumerate(x_t):
             for i in range(len(x)):
@@ -314,7 +328,7 @@ class iLQR:
         :param k: The series coefficient given as a list of length dimensions (list)
         :return: at coefficients for a given k (np array of shape (T, n)) - same shape as x
         """
-        k_str = self.__k_str(k)
+        k_str = self.k_to_str(k)
         lambdak, phik = self.lambdak_values[k_str], self.phik_values[k_str]
         ck = self.calc_ck(k)
         self.at = (lambdak * 2 * (ck - phik) * (1 / self.tf) * self.calc_DFk(k)) + self.at
@@ -350,12 +364,13 @@ class iLQR:
         else:
             f(k_arr)
 
-    @staticmethod
-    def __k_str(k):
-        """
-        Takes k arr and returns a string
-        :param k: The series coefficient given as a list of length dimensions (list)
-        :return: Series coefficient as a string (str)
-        """
-        return ''.join(str(i) for i in k)
+    # @staticmethod
+    # def __k_str(k):
+    #     # make this a lambda function??
+    #     """
+    #     Takes k arr and returns a string
+    #     :param k: The series coefficient given as a list of length dimensions (list)
+    #     :return: Series coefficient as a string (str)
+    #     """
+    #     return ''.join(str(i) for i in k)
 

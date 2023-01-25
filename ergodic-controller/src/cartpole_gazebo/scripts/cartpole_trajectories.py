@@ -48,7 +48,7 @@ def main():
 
     global csv_writer
     demo_number = 1
-    f = open(f'/home/ishaan/catkin_ws/src/cartpole_gazebo/demonstrations/demo{str(demo_number)}.csv', 'w')
+    f = open(f'../demonstrations/demo{str(demo_number)}.csv', 'w')
     csv_writer = csv.writer(f)
 
     rospy.spin()
